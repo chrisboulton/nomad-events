@@ -1,0 +1,87 @@
+nomad:
+  address: "http://localhost:4646"
+  token: ""
+
+outputs:
+  stdout_firehose:
+    type: stdout
+    
+  slack_everything:
+    type: slack
+    webhook_url: "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK"
+    channel: "#general"
+    
+  slack_secret:
+    type: slack
+    webhook_url: "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK"
+    channel: "#secret"
+    
+  slack_node4:
+    type: slack
+    webhook_url: "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK"
+    channel: "#node4-alerts"
+    
+  http_webhook:
+    type: http
+    url: "https://api.example.com/nomad-events"
+    method: "POST"
+    headers:
+      Authorization: "Bearer your-token-here"
+      X-Source: "nomad-events"
+    timeout: 30
+    
+  rabbitmq_events:
+    type: rabbitmq
+    url: "amqp://guest:guest@localhost:5672/"
+    exchange: "nomad.events"
+    routing_key: "nomad.{{.Topic}}.{{.Type}}"
+    queue: "nomad-events"
+    durable: true
+    auto_delete: false
+    
+  exec_processor:
+    type: exec
+    command: ["python3", "/usr/local/bin/process-nomad-event.py"]
+    timeout: 10
+    workdir: "/tmp"
+    env:
+      NOMAD_EVENT_PROCESSOR: "v1.0"
+      LOG_LEVEL: "INFO"
+      
+  exec_simple:
+    type: exec
+    command: "jq '.Topic + \": \" + .Type'"
+    timeout: 5
+
+routes:
+  # Send all events to stdout
+  - filter: ""
+    output: stdout_firehose
+    
+  # Send all events to general Slack channel
+  - filter: ""
+    output: slack_everything
+    
+  # Send Node registration events to secret channel
+  - filter: event.Topic == 'Node' && event.Type == 'NodeRegistration'
+    output: slack_secret
+    
+  # Send node events for node4 to dedicated channel
+  - filter: event.Topic == 'Node' && event.Payload.Node.Name == 'node4'
+    output: slack_node4
+    
+  # Send job events to HTTP webhook
+  - filter: event.Topic == 'Job'
+    output: http_webhook
+    
+  # Send allocation events to RabbitMQ
+  - filter: event.Topic == 'Allocation'
+    output: rabbitmq_events
+    
+  # Process evaluation events with Python script
+  - filter: event.Topic == 'Evaluation'
+    output: exec_processor
+    
+  # Extract topic and type from job events with jq
+  - filter: event.Topic == 'Job'
+    output: exec_simple
