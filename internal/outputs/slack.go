@@ -13,28 +13,16 @@ import (
 type SlackOutput struct {
 	webhookURL     string
 	channel        string
+	textTemplate   string
 	httpClient     *http.Client
 	blockConfigs   []BlockConfig
 	templateEngine *SlackTemplateEngine
 }
 
 type SlackMessage struct {
-	Channel     string      `json:"channel,omitempty"`
-	Text        string      `json:"text,omitempty"`
-	Blocks      interface{} `json:"blocks,omitempty"`
-	Attachments interface{} `json:"attachments,omitempty"`
-}
-
-type SlackAttachment struct {
-	Color  string       `json:"color,omitempty"`
-	Fields []SlackField `json:"fields,omitempty"`
-	Text   string       `json:"text,omitempty"`
-}
-
-type SlackField struct {
-	Title string `json:"title"`
-	Value string `json:"value"`
-	Short bool   `json:"short"`
+	Channel string      `json:"channel,omitempty"`
+	Text    string      `json:"text,omitempty"`
+	Blocks  interface{} `json:"blocks,omitempty"`
 }
 
 // mapBlockConfig maps a configuration map to a BlockConfig struct
@@ -89,6 +77,7 @@ func NewSlackOutput(config map[string]interface{}) (*SlackOutput, error) {
 	}
 
 	channel, _ := config["channel"].(string)
+	textTemplate, _ := config["text"].(string)
 
 	var blockConfigs []BlockConfig
 	if blocksConfig, ok := config["blocks"].([]interface{}); ok {
@@ -101,13 +90,14 @@ func NewSlackOutput(config map[string]interface{}) (*SlackOutput, error) {
 	}
 
 	var templateEngine *SlackTemplateEngine
-	if len(blockConfigs) > 0 {
+	if len(blockConfigs) > 0 || textTemplate != "" {
 		templateEngine = NewSlackTemplateEngine()
 	}
 
 	return &SlackOutput{
 		webhookURL:     webhookURL,
 		channel:        channel,
+		textTemplate:   textTemplate,
 		httpClient:     &http.Client{Timeout: 10 * time.Second},
 		blockConfigs:   blockConfigs,
 		templateEngine: templateEngine,
@@ -118,13 +108,9 @@ func (o *SlackOutput) Send(event nomad.Event) error {
 	var message SlackMessage
 	var err error
 
-	if o.templateEngine != nil && len(o.blockConfigs) > 0 {
-		message, err = o.formatEventWithBlocks(event)
-		if err != nil {
-			message = o.formatEvent(event)
-		}
-	} else {
-		message = o.formatEvent(event)
+	message, err = o.formatEvent(event)
+	if err != nil {
+		return fmt.Errorf("failed to format event: %w", err)
 	}
 
 	payload, err := json.Marshal(message)
@@ -145,75 +131,23 @@ func (o *SlackOutput) Send(event nomad.Event) error {
 	return nil
 }
 
-func (o *SlackOutput) formatEventWithBlocks(event nomad.Event) (SlackMessage, error) {
+func (o *SlackOutput) formatEvent(event nomad.Event) (SlackMessage, error) {
+
 	blocks, err := o.templateEngine.ProcessBlocks(o.blockConfigs, event)
 	if err != nil {
 		return SlackMessage{}, fmt.Errorf("failed to process blocks: %w", err)
 	}
 
-	message := SlackMessage{
-		Blocks: blocks,
+	text, err := o.templateEngine.ProcessText(o.textTemplate, event)
+	if err != nil {
+		return SlackMessage{}, fmt.Errorf("failed to process text: %w", err)
 	}
 
-	if o.channel != "" {
-		message.Channel = o.channel
+	message := SlackMessage{
+		Text:    text,
+		Blocks:  blocks,
+		Channel: o.channel,
 	}
 
 	return message, nil
-}
-
-func (o *SlackOutput) formatEvent(event nomad.Event) SlackMessage {
-	var color string
-	switch event.Topic {
-	case "Node":
-		color = "good"
-	case "Allocation":
-		color = "warning"
-	case "Job":
-		color = "#439FE0"
-	case "Evaluation":
-		color = "#764FA5"
-	default:
-		color = "danger"
-	}
-
-	attachment := SlackAttachment{
-		Color: color,
-		Fields: []SlackField{
-			{Title: "Topic", Value: event.Topic, Short: true},
-			{Title: "Type", Value: event.Type, Short: true},
-			{Title: "Index", Value: fmt.Sprintf("%d", event.Index), Short: true},
-		},
-	}
-
-	if event.Key != "" {
-		attachment.Fields = append(attachment.Fields, SlackField{
-			Title: "Key", Value: event.Key, Short: true,
-		})
-	}
-
-	if event.Namespace != "" {
-		attachment.Fields = append(attachment.Fields, SlackField{
-			Title: "Namespace", Value: event.Namespace, Short: true,
-		})
-	}
-
-	if len(event.Payload) > 0 {
-		var payload interface{}
-		if err := json.Unmarshal(event.Payload, &payload); err == nil {
-			payloadJSON, _ := json.MarshalIndent(payload, "", "  ")
-			attachment.Text = fmt.Sprintf("```\n%s\n```", string(payloadJSON))
-		}
-	}
-
-	message := SlackMessage{
-		Text:        fmt.Sprintf("Nomad Event: %s/%s", event.Topic, event.Type),
-		Attachments: []SlackAttachment{attachment},
-	}
-
-	if o.channel != "" {
-		message.Channel = o.channel
-	}
-
-	return message
 }

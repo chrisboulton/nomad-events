@@ -36,13 +36,46 @@ routes:
 ### Output Types
 
 #### stdout
-Outputs events to standard output as formatted JSON.
+Outputs events to standard output with configurable formatting.
+- `format`: Output format - "json" (default) or "text"
+- `text`: Text template using Go template syntax (required when format is "text")
+
+**JSON Format:**
+Outputs events as single-line JSON for easy parsing and processing.
+
+```yaml
+stdout_json:
+  type: stdout
+  format: json
+```
+
+**Text Format:**
+Outputs events using Go templates for custom formatting:
+
+```yaml
+stdout_text:
+  type: stdout  
+  format: text
+  text: "{{ .Topic }}/{{ .Type }} on {{ .Payload.Node.Name | default \"unknown\" }} (Index: {{ .Index }})"
+```
 
 #### slack  
-Sends events to Slack channels via webhooks with optional BlockKit formatting.
+Sends events to Slack channels via webhooks with optional text templating and BlockKit formatting.
 - `webhook_url`: Slack webhook URL (required)
 - `channel`: Target channel (optional)
+- `text`: Message text template using Go template syntax (optional)
 - `blocks`: Optional BlockKit blocks configuration for rich message formatting
+
+**Text Templating:**
+Use Go template syntax to create dynamic messages from event data:
+
+```yaml
+slack_alerts:
+  type: slack
+  webhook_url: "https://hooks.slack.com/services/..."
+  channel: "#alerts"
+  text: "🚨 {{ .Topic }}/{{ .Type }} event on {{ .Payload.Node.Name | default \"unknown node\" }}"
+```
 
 **BlockKit Configuration:**
 The `blocks` configuration allows you to create rich, interactive Slack messages using Go templates:

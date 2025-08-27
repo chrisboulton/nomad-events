@@ -310,7 +310,7 @@ func TestSlackTemplateEngineComplexMixedBlocks(t *testing.T) {
 		Topic: "Deployment",
 		Type:  "DeploymentStatusUpdate",
 		Index: 12345,
-		Payload: mustMarshalJSON(map[string]interface{}{
+		Payload: map[string]interface{}{
 			"DeploymentID": "deploy-abc123",
 			"Status":       "successful",
 			"Services": []interface{}{
@@ -334,7 +334,7 @@ func TestSlackTemplateEngineComplexMixedBlocks(t *testing.T) {
 					"ID":    "rollback",
 				},
 			},
-		}),
+		},
 	}
 
 	blockConfigs := []BlockConfig{

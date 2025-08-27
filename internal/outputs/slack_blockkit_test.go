@@ -46,6 +46,7 @@ func TestNewSlackOutputWithoutBlocks(t *testing.T) {
 	require.NoError(t, err)
 	assert.Nil(t, output.templateEngine)
 	assert.Empty(t, output.blockConfigs)
+	assert.Empty(t, output.textTemplate)
 }
 
 func TestSlackOutputFormatEventWithBlocks(t *testing.T) {
@@ -74,14 +75,14 @@ func TestSlackOutputFormatEventWithBlocks(t *testing.T) {
 		Topic: "Deployment",
 		Type:  "DeploymentStatusUpdate",
 		Index: 12345,
-		Payload: mustMarshalJSON(map[string]interface{}{
+		Payload: map[string]interface{}{
 			"DeploymentID": "deploy-123",
 			"Status":       "successful",
 			"Node":         "worker-1",
-		}),
+		},
 	}
 
-	message, err := output.formatEventWithBlocks(event)
+	message, err := output.formatEvent(event)
 	require.NoError(t, err)
 	assert.Equal(t, "#deployments", message.Channel)
 	assert.NotNil(t, message.Blocks)
@@ -193,11 +194,81 @@ func TestSlackOutputFallbackToBehavior(t *testing.T) {
 		Index: 123,
 	}
 
-	message, err := output.formatEventWithBlocks(event)
+	message, err := output.formatEvent(event)
 	assert.Error(t, err)
 	assert.Empty(t, message.Blocks)
+}
 
-	fallbackMessage := output.formatEvent(event)
-	assert.Equal(t, "Nomad Event: Node/NodeRegistration", fallbackMessage.Text)
-	assert.NotEmpty(t, fallbackMessage.Attachments)
+func TestNewSlackOutputWithTextTemplate(t *testing.T) {
+	config := map[string]interface{}{
+		"webhook_url": "https://hooks.slack.com/services/test",
+		"channel":     "#alerts",
+		"text":        "🚨 {{ .Topic }}/{{ .Type }} event (Index: {{ .Index }})",
+	}
+
+	output, err := NewSlackOutput(config)
+	require.NoError(t, err)
+	assert.NotNil(t, output.templateEngine)
+	assert.Empty(t, output.blockConfigs)
+	assert.Equal(t, "🚨 {{ .Topic }}/{{ .Type }} event (Index: {{ .Index }})", output.textTemplate)
+}
+
+func TestSlackOutputFormatEventWithTextTemplate(t *testing.T) {
+	config := map[string]interface{}{
+		"webhook_url": "https://hooks.slack.com/services/test",
+		"channel":     "#alerts",
+		"text":        "🚨 {{ .Topic }}/{{ .Type }} on {{ .Payload.Node.Name | default \"unknown\" }} (Index: {{ .Index }})",
+	}
+
+	output, err := NewSlackOutput(config)
+	require.NoError(t, err)
+
+	event := nomad.Event{
+		Topic: "Node",
+		Type:  "NodeUpdate",
+		Index: 12345,
+		Payload: map[string]interface{}{
+			"Node": map[string]interface{}{
+				"Name": "worker-1",
+			},
+		},
+	}
+
+	message, _ := output.formatEvent(event)
+	assert.Equal(t, "#alerts", message.Channel)
+	assert.Equal(t, "🚨 Node/NodeUpdate on worker-1 (Index: 12345)", message.Text)
+	assert.Nil(t, message.Blocks)
+}
+
+func TestSlackOutputFormatEventWithBlocksAndText(t *testing.T) {
+	config := map[string]interface{}{
+		"webhook_url": "https://hooks.slack.com/services/test",
+		"channel":     "#deployments",
+		"text":        "📢 Deployment Event: {{ .Payload.Status }}",
+		"blocks": []interface{}{
+			map[string]interface{}{
+				"type": "header",
+				"text": "Deployment: {{ .Payload.DeploymentID }}",
+			},
+		},
+	}
+
+	output, err := NewSlackOutput(config)
+	require.NoError(t, err)
+
+	event := nomad.Event{
+		Topic: "Deployment",
+		Type:  "DeploymentStatusUpdate",
+		Index: 12345,
+		Payload: map[string]interface{}{
+			"DeploymentID": "deploy-123",
+			"Status":       "successful",
+		},
+	}
+
+	message, err := output.formatEvent(event)
+	require.NoError(t, err)
+	assert.Equal(t, "#deployments", message.Channel)
+	assert.Equal(t, "📢 Deployment Event: successful", message.Text)
+	assert.NotNil(t, message.Blocks)
 }

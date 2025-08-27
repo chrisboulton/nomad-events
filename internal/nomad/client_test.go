@@ -79,7 +79,11 @@ func TestEventStructure(t *testing.T) {
 		Key:       "node-123",
 		Namespace: "default",
 		Index:     12345,
-		Payload:   json.RawMessage(`{"Node": {"Name": "worker-1"}}`),
+		Payload: map[string]interface{}{
+			"Node": map[string]interface{}{
+				"Name": "worker-1",
+			},
+		},
 	}
 
 	assert.Equal(t, "Node", event.Topic)
@@ -88,9 +92,8 @@ func TestEventStructure(t *testing.T) {
 	assert.Equal(t, "default", event.Namespace)
 	assert.Equal(t, uint64(12345), event.Index)
 
-	var payload map[string]interface{}
-	err := json.Unmarshal(event.Payload, &payload)
-	assert.NoError(t, err)
+	payload, ok := event.Payload.(map[string]interface{})
+	assert.True(t, ok)
 	
 	node, ok := payload["Node"].(map[string]interface{})
 	assert.True(t, ok)
@@ -104,7 +107,12 @@ func TestEventJSONSerialization(t *testing.T) {
 		Key:       "job-123",
 		Namespace: "production",
 		Index:     98765,
-		Payload:   json.RawMessage(`{"Job": {"ID": "example-job", "Name": "example"}}`),
+		Payload: map[string]interface{}{
+			"Job": map[string]interface{}{
+				"ID":   "example-job",
+				"Name": "example",
+			},
+		},
 	}
 
 	eventJSON, err := json.Marshal(originalEvent)
@@ -119,12 +127,5 @@ func TestEventJSONSerialization(t *testing.T) {
 	assert.Equal(t, originalEvent.Key, deserializedEvent.Key)
 	assert.Equal(t, originalEvent.Namespace, deserializedEvent.Namespace)
 	assert.Equal(t, originalEvent.Index, deserializedEvent.Index)
-
-	var originalPayload, deserializedPayload map[string]interface{}
-	err = json.Unmarshal(originalEvent.Payload, &originalPayload)
-	require.NoError(t, err)
-	err = json.Unmarshal(deserializedEvent.Payload, &deserializedPayload)
-	require.NoError(t, err)
-
-	assert.Equal(t, originalPayload, deserializedPayload)
+	assert.Equal(t, originalEvent.Payload, deserializedEvent.Payload)
 }

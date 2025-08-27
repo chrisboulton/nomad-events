@@ -5,21 +5,30 @@ nomad:
 outputs:
   stdout_firehose:
     type: stdout
+    format: json
+    
+  stdout_text:
+    type: stdout
+    format: text
+    text: "{{ .Topic }}/{{ .Type }} - {{ .Payload.Node.Name | default \"unknown\" }} (Index: {{ .Index }})"
     
   slack_everything:
     type: slack
     webhook_url: "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK"
     channel: "#general"
+    text: "🔔 {{ .Topic }}/{{ .Type }} event received (Index: {{ .Index }})"
     
   slack_secret:
     type: slack
     webhook_url: "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK"
     channel: "#secret"
+    text: "🔒 Nomad {{ .Topic }} Event: {{ .Type }}{{if .Key}} (Key: {{ .Key }}){{end}}"
     
   slack_node4:
     type: slack
     webhook_url: "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK"
     channel: "#node4-alerts"
+    text: "⚠️ Node {{ .Payload.Node.Name | default \"Unknown\" }} - {{ .Type }}"
     
   http_webhook:
     type: http

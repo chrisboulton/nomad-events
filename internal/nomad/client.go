@@ -2,7 +2,6 @@ package nomad
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"time"
@@ -11,12 +10,12 @@ import (
 )
 
 type Event struct {
-	Topic     string          `json:"Topic"`
-	Type      string          `json:"Type"`
-	Key       string          `json:"Key"`
-	Namespace string          `json:"Namespace"`
-	Index     uint64          `json:"Index"`
-	Payload   json.RawMessage `json:"Payload"`
+	Topic     string      `json:"Topic"`
+	Type      string      `json:"Type"`
+	Key       string      `json:"Key"`
+	Namespace string      `json:"Namespace"`
+	Index     uint64      `json:"Index"`
+	Payload   interface{} `json:"Payload"`
 }
 
 type EventStream struct {
@@ -112,15 +111,13 @@ func (es *EventStream) connectAndStream(ctx context.Context, eventChan chan<- Ev
 			}
 
 			for _, event := range eventWrapper.Events {
-				payloadJSON, _ := json.Marshal(event.Payload)
-				
 				nomadEvent := Event{
 					Topic:     string(event.Topic),
 					Type:      event.Type,
 					Key:       event.Key,
 					Namespace: "",
 					Index:     event.Index,
-					Payload:   payloadJSON,
+					Payload:   event.Payload,
 				}
 
 				es.lastIndex = event.Index

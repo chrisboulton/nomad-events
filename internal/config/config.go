@@ -8,9 +8,9 @@ import (
 )
 
 type Config struct {
-	Nomad   NomadConfig          `yaml:"nomad"`
-	Outputs map[string]Output    `yaml:"outputs"`
-	Routes  []Route              `yaml:"routes"`
+	Nomad   NomadConfig       `yaml:"nomad"`
+	Outputs map[string]Output `yaml:"outputs"`
+	Routes  []Route           `yaml:"routes"`
 }
 
 type NomadConfig struct {
@@ -24,8 +24,9 @@ type Output struct {
 }
 
 type Route struct {
-	Filter string `yaml:"filter"`
-	Output string `yaml:"output"`
+	Filter         string `yaml:"filter"`
+	Output         string `yaml:"output"`
+	StopProcessing bool   `yaml:"stop_processing"`
 }
 
 func LoadConfig(path string) (*Config, error) {

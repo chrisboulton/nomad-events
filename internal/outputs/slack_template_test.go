@@ -1,7 +1,6 @@
 package outputs
 
 import (
-	"encoding/json"
 	"fmt"
 	"testing"
 
@@ -242,11 +241,11 @@ func TestSlackTemplateEngineProcessBlocks(t *testing.T) {
 		Topic: "Deployment",
 		Type:  "DeploymentPromotion",
 		Index: 12345,
-		Payload: mustMarshalJSON(map[string]interface{}{
+		Payload: map[string]interface{}{
 			"DeploymentID": "deploy-abc123",
 			"Status":       "successful",
 			"Node":         "worker-1",
-		}),
+		},
 	}
 
 	blockConfigs := []BlockConfig{
@@ -338,12 +337,12 @@ func TestSlackTemplateEngineCreateTemplateData(t *testing.T) {
 		Key:       "node-123",
 		Namespace: "default",
 		Index:     12345,
-		Payload: mustMarshalJSON(map[string]interface{}{
+		Payload: map[string]interface{}{
 			"Node": map[string]interface{}{
 				"Name": "worker-1",
 				"ID":   "node-123",
 			},
-		}),
+		},
 	}
 
 	data := engine.createTemplateData(event)
@@ -415,10 +414,3 @@ func TestSlackTemplateEngineGetNestedValue(t *testing.T) {
 	}
 }
 
-func mustMarshalJSON(v interface{}) []byte {
-	data, err := json.Marshal(v)
-	if err != nil {
-		panic(err)
-	}
-	return data
-}

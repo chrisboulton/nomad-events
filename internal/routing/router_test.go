@@ -1,7 +1,6 @@
 package routing
 
 import (
-	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -83,12 +82,12 @@ func TestRouterRoute(t *testing.T) {
 				Type:  "NodeRegistration",
 				Key:   "node-1",
 				Index: 1,
-				Payload: mustMarshal(map[string]interface{}{
+				Payload: map[string]interface{}{
 					"Node": map[string]interface{}{
 						"Name": "worker-1",
 						"ID":   "node-1",
 					},
-				}),
+				},
 			},
 			expectedOutputs: []string{"all_events", "node_events", "registrations", "worker1_events"},
 		},
@@ -99,12 +98,12 @@ func TestRouterRoute(t *testing.T) {
 				Type:  "JobRegistered",
 				Key:   "job-1",
 				Index: 2,
-				Payload: mustMarshal(map[string]interface{}{
+				Payload: map[string]interface{}{
 					"Job": map[string]interface{}{
 						"Name": "example-job",
 						"ID":   "job-1",
 					},
-				}),
+				},
 			},
 			expectedOutputs: []string{"all_events", "job_registered"},
 		},
@@ -115,12 +114,12 @@ func TestRouterRoute(t *testing.T) {
 				Type:  "AllocationCreated",
 				Key:   "alloc-1",
 				Index: 3,
-				Payload: mustMarshal(map[string]interface{}{
+				Payload: map[string]interface{}{
 					"Allocation": map[string]interface{}{
 						"ID":    "alloc-1",
 						"JobID": "job-1",
 					},
-				}),
+				},
 			},
 			expectedOutputs: []string{"all_events"},
 		},
@@ -131,12 +130,12 @@ func TestRouterRoute(t *testing.T) {
 				Type:  "NodeUpdate",
 				Key:   "node-2",
 				Index: 4,
-				Payload: mustMarshal(map[string]interface{}{
+				Payload: map[string]interface{}{
 					"Node": map[string]interface{}{
 						"Name": "worker-2",
 						"ID":   "node-2",
 					},
-				}),
+				},
 			},
 			expectedOutputs: []string{"all_events", "node_events"},
 		},
@@ -171,46 +170,4 @@ func TestRouterRouteNonExistentField(t *testing.T) {
 	assert.Equal(t, []string{"all_events"}, outputs)
 }
 
-func TestParsePayload(t *testing.T) {
-	tests := []struct {
-		name     string
-		payload  []byte
-		expected interface{}
-	}{
-		{
-			name:     "valid JSON object",
-			payload:  []byte(`{"key": "value", "number": 42}`),
-			expected: map[string]interface{}{"key": "value", "number": float64(42)},
-		},
-		{
-			name:     "valid JSON array",
-			payload:  []byte(`[1, 2, 3]`),
-			expected: []interface{}{float64(1), float64(2), float64(3)},
-		},
-		{
-			name:     "invalid JSON",
-			payload:  []byte(`{invalid json`),
-			expected: "{invalid json",
-		},
-		{
-			name:     "empty payload",
-			payload:  []byte{},
-			expected: nil,
-		},
-	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := parsePayload(tt.payload)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
-}
-
-func mustMarshal(v interface{}) []byte {
-	data, err := json.Marshal(v)
-	if err != nil {
-		panic(err)
-	}
-	return data
-}

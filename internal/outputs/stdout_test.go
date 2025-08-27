@@ -12,9 +12,54 @@ import (
 )
 
 func TestNewStdoutOutput(t *testing.T) {
-	output, err := NewStdoutOutput(map[string]interface{}{})
-	assert.NoError(t, err)
-	assert.NotNil(t, output)
+	tests := []struct {
+		name        string
+		config      map[string]interface{}
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name:        "default json format",
+			config:      map[string]interface{}{},
+			expectError: false,
+		},
+		{
+			name:        "explicit json format",
+			config:      map[string]interface{}{"format": "json"},
+			expectError: false,
+		},
+		{
+			name:        "text format with template",
+			config:      map[string]interface{}{"format": "text", "text": "{{ .Topic }}/{{ .Type }}"},
+			expectError: false,
+		},
+		{
+			name:        "text format without template",
+			config:      map[string]interface{}{"format": "text"},
+			expectError: true,
+			errorMsg:    "text template is required when format is 'text'",
+		},
+		{
+			name:        "invalid format",
+			config:      map[string]interface{}{"format": "xml"},
+			expectError: true,
+			errorMsg:    "invalid format \"xml\": must be 'json' or 'text'",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			output, err := NewStdoutOutput(tt.config)
+			if tt.expectError {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errorMsg)
+				assert.Nil(t, output)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, output)
+			}
+		})
+	}
 }
 
 func TestStdoutOutputSend(t *testing.T) {
@@ -27,7 +72,11 @@ func TestStdoutOutputSend(t *testing.T) {
 		Key:       "node-1",
 		Namespace: "default",
 		Index:     123,
-		Payload:   []byte(`{"Node": {"Name": "worker-1"}}`),
+		Payload: map[string]interface{}{
+			"Node": map[string]interface{}{
+				"Name": "worker-1",
+			},
+		},
 	}
 
 	old := os.Stdout

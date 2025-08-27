@@ -1,20 +1,18 @@
 package outputs
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
-	"text/template"
 
 	"nomad-events/internal/nomad"
+	"nomad-events/internal/template"
 
 	"github.com/slack-go/slack"
 )
 
 type SlackTemplateEngine struct {
-	funcMap template.FuncMap
+	engine *template.Engine
 }
 
 type BlockConfig struct {
@@ -54,21 +52,15 @@ type OptionConfig struct {
 }
 
 func NewSlackTemplateEngine() *SlackTemplateEngine {
-	funcMap := template.FuncMap{
-		"upper": strings.ToUpper,
-		"lower": strings.ToLower,
-		"title": strings.Title,
-	}
-
 	return &SlackTemplateEngine{
-		funcMap: funcMap,
+		engine: template.NewEngine(),
 	}
 }
 
 func (ste *SlackTemplateEngine) ProcessBlocks(blockConfigs []BlockConfig, event nomad.Event) ([]slack.Block, error) {
 	var blocks []slack.Block
 
-	eventData := ste.createTemplateData(event)
+	eventData := ste.engine.CreateTemplateData(event)
 
 	for _, blockConfig := range blockConfigs {
 		if isRange, rangePath := ste.isRangeItem(blockConfig); isRange {
@@ -98,6 +90,10 @@ func (ste *SlackTemplateEngine) ProcessBlocks(blockConfigs []BlockConfig, event 
 	}
 
 	return blocks, nil
+}
+
+func (ste *SlackTemplateEngine) ProcessText(text string, event nomad.Event) (string, error) {
+	return ste.engine.ProcessText(text, event)
 }
 
 func (ste *SlackTemplateEngine) processBlock(blockConfig BlockConfig, eventData map[string]interface{}) (slack.Block, error) {
@@ -487,39 +483,9 @@ func (ste *SlackTemplateEngine) processText(text interface{}, eventData map[stri
 		return "", fmt.Errorf("text must be a string")
 	}
 
-	tmpl, err := template.New("slack").Funcs(ste.funcMap).Parse(textStr)
-	if err != nil {
-		return textStr, nil
-	}
-
-	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, eventData); err != nil {
-		return textStr, nil
-	}
-
-	return buf.String(), nil
+	return ste.engine.ProcessTextWithData(textStr, eventData)
 }
 
-func (ste *SlackTemplateEngine) createTemplateData(event nomad.Event) map[string]interface{} {
-	data := map[string]interface{}{
-		"Topic":     event.Topic,
-		"Type":      event.Type,
-		"Key":       event.Key,
-		"Namespace": event.Namespace,
-		"Index":     event.Index,
-	}
-
-	if len(event.Payload) > 0 {
-		var payload interface{}
-		if err := json.Unmarshal(event.Payload, &payload); err == nil {
-			data["Payload"] = payload
-		} else {
-			data["Payload"] = string(event.Payload)
-		}
-	}
-
-	return data
-}
 
 func (ste *SlackTemplateEngine) getNestedValue(data map[string]interface{}, path string) (interface{}, error) {
 	parts := strings.Split(path, ".")

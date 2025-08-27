@@ -1,13 +1,13 @@
 package routing
 
 import (
-	"encoding/json"
 	"fmt"
+
+	"nomad-events/internal/config"
+	"nomad-events/internal/nomad"
 
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types"
-	"nomad-events/internal/config"
-	"nomad-events/internal/nomad"
 )
 
 type Router struct {
@@ -15,8 +15,9 @@ type Router struct {
 }
 
 type rule struct {
-	filter  cel.Program
-	outputs []string
+	filter         cel.Program
+	outputs        []string
+	stopProcessing bool
 }
 
 func NewRouter(routes []config.Route) (*Router, error) {
@@ -28,10 +29,10 @@ func NewRouter(routes []config.Route) (*Router, error) {
 	}
 
 	rules := make([]rule, 0, len(routes))
-	
+
 	for i, route := range routes {
 		var program cel.Program
-		
+
 		if route.Filter == "" {
 			ast, issues := env.Compile("true")
 			if issues.Err() != nil {
@@ -54,8 +55,9 @@ func NewRouter(routes []config.Route) (*Router, error) {
 		}
 
 		rules = append(rules, rule{
-			filter:  program,
-			outputs: []string{route.Output},
+			filter:         program,
+			outputs:        []string{route.Output},
+			stopProcessing: route.StopProcessing,
 		})
 	}
 
@@ -71,7 +73,7 @@ func (r *Router) Route(event nomad.Event) ([]string, error) {
 		"Key":       event.Key,
 		"Namespace": event.Namespace,
 		"Index":     event.Index,
-		"Payload":   parsePayload(event.Payload),
+		"Payload":   event.Payload,
 	}
 
 	for _, rule := range r.rules {
@@ -84,20 +86,11 @@ func (r *Router) Route(event nomad.Event) ([]string, error) {
 
 		if result == types.True {
 			matchedOutputs = append(matchedOutputs, rule.outputs...)
+			if rule.stopProcessing {
+				break
+			}
 		}
 	}
 
 	return matchedOutputs, nil
-}
-
-func parsePayload(payload []byte) interface{} {
-	if len(payload) == 0 {
-		return nil
-	}
-
-	var result interface{}
-	if err := json.Unmarshal(payload, &result); err != nil {
-		return string(payload)
-	}
-	return result
 }
