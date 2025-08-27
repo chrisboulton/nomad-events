@@ -8,6 +8,7 @@ import (
 	"nomad-events/internal/nomad"
 	"nomad-events/internal/template"
 
+	"github.com/hashicorp/nomad/api"
 	"github.com/slack-go/slack"
 )
 
@@ -51,9 +52,9 @@ type OptionConfig struct {
 	Value string      `yaml:"value"`
 }
 
-func NewSlackTemplateEngine() *SlackTemplateEngine {
+func NewSlackTemplateEngine(nomadClient *api.Client) *SlackTemplateEngine {
 	return &SlackTemplateEngine{
-		engine: template.NewEngine(),
+		engine: template.NewEngine(nomadClient),
 	}
 }
 

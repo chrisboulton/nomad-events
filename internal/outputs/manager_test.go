@@ -60,7 +60,7 @@ func TestNewManager(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			manager, err := NewManager(tt.outputConfigs)
+			manager, err := NewManager(tt.outputConfigs, nil)
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -88,7 +88,7 @@ func TestManagerSend(t *testing.T) {
 		},
 	}
 
-	manager, err := NewManager(outputConfigs)
+	manager, err := NewManager(outputConfigs, nil)
 	require.NoError(t, err)
 
 	event := nomad.Event{
@@ -116,7 +116,7 @@ func TestManagerGetOutput(t *testing.T) {
 		},
 	}
 
-	manager, err := NewManager(outputConfigs)
+	manager, err := NewManager(outputConfigs, nil)
 	require.NoError(t, err)
 
 	t.Run("get existing output", func(t *testing.T) {
@@ -194,7 +194,7 @@ func TestCreateOutput(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			output, err := createOutput(tt.config)
+			output, err := createOutput(tt.config, nil)
 
 			if tt.expectError {
 				assert.Error(t, err)

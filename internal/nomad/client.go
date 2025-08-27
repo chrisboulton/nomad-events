@@ -54,7 +54,7 @@ func (es *EventStream) Stream(ctx context.Context, eventChan chan<- Event) error
 
 		if err := es.streamWithRetry(ctx, eventChan); err != nil {
 			log.Printf("Stream ended with error: %v", err)
-			
+
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
@@ -80,7 +80,7 @@ func (es *EventStream) streamWithRetry(ctx context.Context, eventChan chan<- Eve
 		}
 
 		log.Printf("Connection failed (attempt %d/%d): %v", retries, es.maxRetries, err)
-		
+
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
@@ -137,4 +137,8 @@ func (es *EventStream) exponentialBackoff() {
 	if es.retryBackoff > time.Minute {
 		es.retryBackoff = time.Minute
 	}
+}
+
+func (es *EventStream) Client() *api.Client {
+	return es.client
 }

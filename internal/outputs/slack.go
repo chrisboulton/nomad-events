@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"nomad-events/internal/nomad"
+
+	"github.com/hashicorp/nomad/api"
 )
 
 type SlackOutput struct {
@@ -70,7 +72,7 @@ func mapBlockConfig(config map[string]interface{}) BlockConfig {
 	return block
 }
 
-func NewSlackOutput(config map[string]interface{}) (*SlackOutput, error) {
+func NewSlackOutput(config map[string]interface{}, nomadClient *api.Client) (*SlackOutput, error) {
 	webhookURL, ok := config["webhook_url"].(string)
 	if !ok || webhookURL == "" {
 		return nil, fmt.Errorf("webhook_url is required for Slack output")
@@ -91,7 +93,7 @@ func NewSlackOutput(config map[string]interface{}) (*SlackOutput, error) {
 
 	var templateEngine *SlackTemplateEngine
 	if len(blockConfigs) > 0 || textTemplate != "" {
-		templateEngine = NewSlackTemplateEngine()
+		templateEngine = NewSlackTemplateEngine(nomadClient)
 	}
 
 	return &SlackOutput{

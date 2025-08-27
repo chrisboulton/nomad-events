@@ -28,7 +28,7 @@ func TestNewSlackOutputWithBlocks(t *testing.T) {
 		},
 	}
 
-	output, err := NewSlackOutput(config)
+	output, err := NewSlackOutput(config, nil)
 	require.NoError(t, err)
 	assert.NotNil(t, output.templateEngine)
 	assert.Len(t, output.blockConfigs, 2)
@@ -42,7 +42,7 @@ func TestNewSlackOutputWithoutBlocks(t *testing.T) {
 		"channel":     "#test",
 	}
 
-	output, err := NewSlackOutput(config)
+	output, err := NewSlackOutput(config, nil)
 	require.NoError(t, err)
 	assert.Nil(t, output.templateEngine)
 	assert.Empty(t, output.blockConfigs)
@@ -68,7 +68,7 @@ func TestSlackOutputFormatEventWithBlocks(t *testing.T) {
 		},
 	}
 
-	output, err := NewSlackOutput(config)
+	output, err := NewSlackOutput(config, nil)
 	require.NoError(t, err)
 
 	event := nomad.Event{
@@ -160,7 +160,7 @@ func TestSlackOutputBlockConfigParsing(t *testing.T) {
 				"blocks":      []interface{}{tt.blockConfig},
 			}
 
-			output, err := NewSlackOutput(config)
+			output, err := NewSlackOutput(config, nil)
 			require.NoError(t, err)
 			require.Len(t, output.blockConfigs, 1)
 
@@ -185,7 +185,7 @@ func TestSlackOutputFallbackToBehavior(t *testing.T) {
 		},
 	}
 
-	output, err := NewSlackOutput(config)
+	output, err := NewSlackOutput(config, nil)
 	require.NoError(t, err)
 
 	event := nomad.Event{
@@ -206,7 +206,7 @@ func TestNewSlackOutputWithTextTemplate(t *testing.T) {
 		"text":        "🚨 {{ .Topic }}/{{ .Type }} event (Index: {{ .Index }})",
 	}
 
-	output, err := NewSlackOutput(config)
+	output, err := NewSlackOutput(config, nil)
 	require.NoError(t, err)
 	assert.NotNil(t, output.templateEngine)
 	assert.Empty(t, output.blockConfigs)
@@ -220,7 +220,7 @@ func TestSlackOutputFormatEventWithTextTemplate(t *testing.T) {
 		"text":        "🚨 {{ .Topic }}/{{ .Type }} on {{ .Payload.Node.Name | default \"unknown\" }} (Index: {{ .Index }})",
 	}
 
-	output, err := NewSlackOutput(config)
+	output, err := NewSlackOutput(config, nil)
 	require.NoError(t, err)
 
 	event := nomad.Event{
@@ -253,7 +253,7 @@ func TestSlackOutputFormatEventWithBlocksAndText(t *testing.T) {
 		},
 	}
 
-	output, err := NewSlackOutput(config)
+	output, err := NewSlackOutput(config, nil)
 	require.NoError(t, err)
 
 	event := nomad.Event{

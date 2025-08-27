@@ -7,6 +7,8 @@ import (
 
 	"nomad-events/internal/nomad"
 	"nomad-events/internal/template"
+
+	"github.com/hashicorp/nomad/api"
 )
 
 type StdoutOutput struct {
@@ -15,7 +17,7 @@ type StdoutOutput struct {
 	templateEngine *template.Engine
 }
 
-func NewStdoutOutput(config map[string]interface{}) (*StdoutOutput, error) {
+func NewStdoutOutput(config map[string]interface{}, nomadClient *api.Client) (*StdoutOutput, error) {
 	format, _ := config["format"].(string)
 	if format == "" {
 		format = "json" // Default to JSON format
@@ -32,7 +34,7 @@ func NewStdoutOutput(config map[string]interface{}) (*StdoutOutput, error) {
 		if textTemplate == "" {
 			return nil, fmt.Errorf("text template is required when format is 'text'")
 		}
-		templateEngine = template.NewEngine()
+		templateEngine = template.NewEngine(nomadClient)
 	}
 
 	return &StdoutOutput{

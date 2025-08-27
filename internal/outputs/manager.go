@@ -5,6 +5,8 @@ import (
 
 	"nomad-events/internal/config"
 	"nomad-events/internal/nomad"
+
+	"github.com/hashicorp/nomad/api"
 )
 
 type Output interface {
@@ -12,29 +14,30 @@ type Output interface {
 }
 
 type Manager struct {
-	outputs map[string]Output
+	outputs     map[string]Output
+	nomadClient *api.Client
 }
 
-func NewManager(outputConfigs map[string]config.Output) (*Manager, error) {
+func NewManager(outputConfigs map[string]config.Output, nomadClient *api.Client) (*Manager, error) {
 	outputs := make(map[string]Output)
 
 	for name, cfg := range outputConfigs {
-		output, err := createOutput(cfg)
+		output, err := createOutput(cfg, nomadClient)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create output %q: %w", name, err)
 		}
 		outputs[name] = output
 	}
 
-	return &Manager{outputs: outputs}, nil
+	return &Manager{outputs: outputs, nomadClient: nomadClient}, nil
 }
 
-func createOutput(cfg config.Output) (Output, error) {
+func createOutput(cfg config.Output, nomadClient *api.Client) (Output, error) {
 	switch cfg.Type {
 	case "stdout":
-		return NewStdoutOutput(cfg.Properties)
+		return NewStdoutOutput(cfg.Properties, nomadClient)
 	case "slack":
-		return NewSlackOutput(cfg.Properties)
+		return NewSlackOutput(cfg.Properties, nomadClient)
 	case "http":
 		return NewHTTPOutput(cfg.Properties)
 	case "rabbitmq":

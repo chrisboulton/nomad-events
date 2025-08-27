@@ -5,7 +5,7 @@ A Go service that connects to the Nomad HTTP events streaming API, processes eve
 ## Features
 
 - **Nomad Event Streaming**: Connects to Nomad's event stream API with automatic reconnection and backoff
-- **Configurable Routing**: CEL-based expression filtering to route events to specific outputs  
+- **Configurable Routing**: CEL-based expression filtering to route events to specific outputs
 - **Multiple Output Types**: Support for stdout, Slack, HTTP webhooks, RabbitMQ, and command execution
 - **Fault Tolerance**: Automatic reconnection with exponential backoff when connections are lost
 - **Index Tracking**: Resumes from last received event index after reconnection
@@ -22,7 +22,7 @@ nomad:
 outputs:
   stdout_output:
     type: stdout
-  
+
   slack_alerts:
     type: slack
     webhook_url: "https://hooks.slack.com/services/..."
@@ -54,12 +54,12 @@ Outputs events using Go templates for custom formatting:
 
 ```yaml
 stdout_text:
-  type: stdout  
+  type: stdout
   format: text
   text: "{{ .Topic }}/{{ .Type }} on {{ .Payload.Node.Name | default \"unknown\" }} (Index: {{ .Index }})"
 ```
 
-#### slack  
+#### slack
 Sends events to Slack channels via webhooks with optional text templating and BlockKit formatting.
 - `webhook_url`: Slack webhook URL (required)
 - `channel`: Target channel (optional)
@@ -124,6 +124,7 @@ slack_deployments:
 - Custom `range` directive for iterating over arrays at block and property level
 - Mixed static and dynamic content in all array properties
 - Template functions: `upper`, `lower`, `title`
+- Nomad API helper functions for retrieving job and cluster information
 - Graceful fallback to simple message format on errors
 
 **Enhanced Range Support:**
@@ -175,7 +176,7 @@ The `range` directive now works within any array property, allowing you to mix s
 
 #### http
 Sends events via HTTP requests.
-- `url`: Target URL (required) 
+- `url`: Target URL (required)
 - `method`: HTTP method (default: POST)
 - `headers`: Custom headers map
 - `timeout`: Request timeout in seconds (default: 10)
@@ -185,16 +186,74 @@ Publishes events to RabbitMQ.
 - `url`: AMQP connection URL (required)
 - `exchange`: Exchange name
 - `routing_key`: Routing key pattern
-- `queue`: Queue name  
+- `queue`: Queue name
 - `durable`: Durable queues/exchanges (default: true)
 - `auto_delete`: Auto-delete queues/exchanges (default: false)
 
 #### exec
 Executes a command with event data passed via stdin as JSON.
 - `command`: Command to execute (required) - can be string or array
-- `timeout`: Command timeout in seconds (default: 30)  
+- `timeout`: Command timeout in seconds (default: 30)
 - `workdir`: Working directory for command execution
 - `env`: Environment variables map
+
+### Template Functions
+
+Templates support several helper functions for enriching output with additional data from the Nomad API:
+
+#### Nomad API Functions
+These functions allow templates to retrieve live data from the Nomad cluster:
+
+- `job "job-id"`: Retrieve a Nomad job by ID
+- `jobAllocs "job-id"`: Get allocations for a job
+- `jobEvaluations "job-id"`: Get evaluations for a job
+- `jobSummary "job-id"`: Get job summary
+- `evaluation "eval-id"`: Retrieve evaluation by ID
+- `evaluationAllocs "eval-id"`: Get allocations for evaluation
+- `deploymentAllocs "deployment-id"`: Get allocations for deployment
+
+**Example Usage:**
+```yaml
+slack_job_info:
+  type: slack
+  webhook_url: "https://hooks.slack.com/services/..."
+  channel: "#jobs"
+  text: |
+    Job: {{ .Payload.Job.ID }}
+    Current Status: {{ (job .Payload.Job.ID).Status }}
+    Running Allocations: {{ len (jobAllocs .Payload.Job.ID) }}
+    Summary: {{ (jobSummary .Payload.Job.ID).Summary }}
+```
+
+**Example with BlockKit:**
+```yaml
+slack_job_details:
+  type: slack
+  webhook_url: "https://hooks.slack.com/services/..."
+  channel: "#jobs"
+  blocks:
+    - type: header
+      text: "📋 Job: {{ .Payload.Job.ID }}"
+    - type: section
+      text:
+        type: mrkdwn
+        text: "*Status:* {{ (job .Payload.Job.ID).Status }}\n*Type:* {{ (job .Payload.Job.ID).Type }}"
+      fields:
+        - type: mrkdwn
+          text: "*Running:*"
+        - type: plain_text
+          text: "{{ (jobSummary .Payload.Job.ID).Summary.Running }}"
+        - type: mrkdwn
+          text: "*Failed:*"
+        - type: plain_text
+          text: "{{ (jobSummary .Payload.Job.ID).Summary.Failed }}"
+    - type: context
+      elements:
+        - type: mrkdwn
+          text: "Total Allocations: {{ len (jobAllocs .Payload.Job.ID) }}"
+```
+
+Note: These functions make live API calls to Nomad, so use them judiciously to avoid performance impact. Functions return `nil` if the API call fails or if the Nomad client is not available.
 
 ### Routing Rules
 
@@ -205,11 +264,11 @@ routes:
   # All events
   - filter: ""
     output: stdout_output
-    
+
   # Node registration events only
-  - filter: event.Topic == 'Node' && event.Type == 'NodeRegistration' 
+  - filter: event.Topic == 'Node' && event.Type == 'NodeRegistration'
     output: slack_alerts
-    
+
   # Events for specific node
   - filter: event.Topic == 'Node' && event.Payload.Node.Name == 'worker-1'
     output: node_specific_output
@@ -217,7 +276,7 @@ routes:
 
 Event fields available in filters:
 - `event.Topic`: Event topic (Node, Job, Allocation, etc.)
-- `event.Type`: Event type 
+- `event.Type`: Event type
 - `event.Key`: Event key
 - `event.Namespace`: Nomad namespace
 - `event.Index`: Event index
@@ -239,13 +298,14 @@ go build -o nomad-events cmd/nomad-events/main.go
 ./nomad-events -config /path/to/config.yaml
 ```
 
-## Example Event
+## Example Events
 
 Events received from Nomad have the following structure:
 
+**Node Event:**
 ```json
 {
-  "Topic": "Node", 
+  "Topic": "Node",
   "Type": "NodeRegistration",
   "Key": "node-id",
   "Namespace": "default",

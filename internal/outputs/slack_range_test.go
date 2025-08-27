@@ -10,7 +10,7 @@ import (
 )
 
 func TestSlackTemplateEngineMixedStaticDynamicFields(t *testing.T) {
-	engine := NewSlackTemplateEngine()
+	engine := NewSlackTemplateEngine(nil)
 	eventData := map[string]interface{}{
 		"Topic": "Node",
 		"Type":  "NodeUpdate",
@@ -86,7 +86,7 @@ func TestSlackTemplateEngineMixedStaticDynamicFields(t *testing.T) {
 }
 
 func TestSlackTemplateEngineMixedStaticDynamicActionElements(t *testing.T) {
-	engine := NewSlackTemplateEngine()
+	engine := NewSlackTemplateEngine(nil)
 	eventData := map[string]interface{}{
 		"Topic": "Deployment",
 		"Type":  "DeploymentUpdate",
@@ -163,7 +163,7 @@ func TestSlackTemplateEngineMixedStaticDynamicActionElements(t *testing.T) {
 }
 
 func TestSlackTemplateEngineMixedStaticDynamicSelectOptions(t *testing.T) {
-	engine := NewSlackTemplateEngine()
+	engine := NewSlackTemplateEngine(nil)
 	eventData := map[string]interface{}{
 		"Topic": "Node",
 		"Payload": map[string]interface{}{
@@ -244,7 +244,7 @@ func TestSlackTemplateEngineMixedStaticDynamicSelectOptions(t *testing.T) {
 }
 
 func TestSlackTemplateEngineMixedStaticDynamicContextElements(t *testing.T) {
-	engine := NewSlackTemplateEngine()
+	engine := NewSlackTemplateEngine(nil)
 	eventData := map[string]interface{}{
 		"Topic": "Node",
 		"Payload": map[string]interface{}{
@@ -304,7 +304,7 @@ func TestSlackTemplateEngineMixedStaticDynamicContextElements(t *testing.T) {
 }
 
 func TestSlackTemplateEngineComplexMixedBlocks(t *testing.T) {
-	engine := NewSlackTemplateEngine()
+	engine := NewSlackTemplateEngine(nil)
 	
 	event := nomad.Event{
 		Topic: "Deployment",
@@ -463,7 +463,7 @@ func TestSlackTemplateEngineComplexMixedBlocks(t *testing.T) {
 }
 
 func TestSlackTemplateEngineRangeErrorHandling(t *testing.T) {
-	engine := NewSlackTemplateEngine()
+	engine := NewSlackTemplateEngine(nil)
 	eventData := map[string]interface{}{
 		"Topic": "Node",
 	}

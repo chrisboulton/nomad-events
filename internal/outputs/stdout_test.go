@@ -49,7 +49,7 @@ func TestNewStdoutOutput(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			output, err := NewStdoutOutput(tt.config)
+			output, err := NewStdoutOutput(tt.config, nil)
 			if tt.expectError {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errorMsg)
@@ -63,7 +63,7 @@ func TestNewStdoutOutput(t *testing.T) {
 }
 
 func TestStdoutOutputSend(t *testing.T) {
-	output, err := NewStdoutOutput(map[string]interface{}{})
+	output, err := NewStdoutOutput(map[string]interface{}{}, nil)
 	require.NoError(t, err)
 
 	event := nomad.Event{

@@ -12,13 +12,13 @@ import (
 )
 
 func TestNewSlackTemplateEngine(t *testing.T) {
-	engine := NewSlackTemplateEngine()
+	engine := NewSlackTemplateEngine(nil)
 	assert.NotNil(t, engine)
-	assert.NotNil(t, engine.funcMap)
+	assert.NotNil(t, engine.engine)
 }
 
 func TestSlackTemplateEngineProcessText(t *testing.T) {
-	engine := NewSlackTemplateEngine()
+	engine := NewSlackTemplateEngine(nil)
 	eventData := map[string]interface{}{
 		"Topic": "Node",
 		"Type":  "NodeRegistration",
@@ -72,7 +72,7 @@ func TestSlackTemplateEngineProcessText(t *testing.T) {
 }
 
 func TestSlackTemplateEngineCreateHeaderBlock(t *testing.T) {
-	engine := NewSlackTemplateEngine()
+	engine := NewSlackTemplateEngine(nil)
 	eventData := map[string]interface{}{
 		"Topic": "Deployment",
 		"Payload": map[string]interface{}{
@@ -94,7 +94,7 @@ func TestSlackTemplateEngineCreateHeaderBlock(t *testing.T) {
 }
 
 func TestSlackTemplateEngineCreateSectionBlock(t *testing.T) {
-	engine := NewSlackTemplateEngine()
+	engine := NewSlackTemplateEngine(nil)
 	eventData := map[string]interface{}{
 		"Topic": "Node",
 		"Payload": map[string]interface{}{
@@ -135,7 +135,7 @@ func TestSlackTemplateEngineCreateSectionBlock(t *testing.T) {
 }
 
 func TestSlackTemplateEngineCreateActionBlock(t *testing.T) {
-	engine := NewSlackTemplateEngine()
+	engine := NewSlackTemplateEngine(nil)
 	eventData := map[string]interface{}{
 		"Payload": map[string]interface{}{
 			"DeploymentID": "deploy-123",
@@ -171,7 +171,7 @@ func TestSlackTemplateEngineCreateActionBlock(t *testing.T) {
 }
 
 func TestSlackTemplateEngineProcessRangeBlocks(t *testing.T) {
-	engine := NewSlackTemplateEngine()
+	engine := NewSlackTemplateEngine(nil)
 	eventData := map[string]interface{}{
 		"Topic": "Node",
 		"Payload": map[string]interface{}{
@@ -235,7 +235,7 @@ func TestSlackTemplateEngineProcessRangeBlocks(t *testing.T) {
 }
 
 func TestSlackTemplateEngineProcessBlocks(t *testing.T) {
-	engine := NewSlackTemplateEngine()
+	engine := NewSlackTemplateEngine(nil)
 
 	event := nomad.Event{
 		Topic: "Deployment",
@@ -282,7 +282,7 @@ func TestSlackTemplateEngineProcessBlocks(t *testing.T) {
 }
 
 func TestSlackTemplateEngineParseTextConfig(t *testing.T) {
-	engine := NewSlackTemplateEngine()
+	engine := NewSlackTemplateEngine(nil)
 	eventData := map[string]interface{}{
 		"Topic": "Node",
 	}
@@ -329,7 +329,7 @@ func TestSlackTemplateEngineParseTextConfig(t *testing.T) {
 }
 
 func TestSlackTemplateEngineCreateTemplateData(t *testing.T) {
-	engine := NewSlackTemplateEngine()
+	engine := NewSlackTemplateEngine(nil)
 
 	event := nomad.Event{
 		Topic:     "Node",
@@ -345,7 +345,7 @@ func TestSlackTemplateEngineCreateTemplateData(t *testing.T) {
 		},
 	}
 
-	data := engine.createTemplateData(event)
+	data := engine.engine.CreateTemplateData(event)
 
 	assert.Equal(t, "Node", data["Topic"])
 	assert.Equal(t, "NodeRegistration", data["Type"])
@@ -363,7 +363,7 @@ func TestSlackTemplateEngineCreateTemplateData(t *testing.T) {
 }
 
 func TestSlackTemplateEngineGetNestedValue(t *testing.T) {
-	engine := NewSlackTemplateEngine()
+	engine := NewSlackTemplateEngine(nil)
 	data := map[string]interface{}{
 		"Payload": map[string]interface{}{
 			"Node": map[string]interface{}{
