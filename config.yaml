@@ -52,6 +52,108 @@ outputs:
     type: exec
     command: "jq '.Topic + \": \" + .Type'"
     timeout: 5
+    
+  slack_blockkit_deployments:
+    type: slack
+    webhook_url: "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK"
+    channel: "#deployments"
+    blocks:
+      - type: header
+        text: "🚀 Deployment: {{ .Payload.DeploymentID }}"
+      - type: divider
+      - type: section
+        text:
+          type: mrkdwn
+          text: "*Status:* {{ .Payload.Status }}\n*Services:* {{ .Payload.ServiceCount }} deployed"
+        fields:
+          # Static fields
+          - type: mrkdwn
+            text: "*Started:*"
+          - type: plain_text
+            text: "{{ .Payload.StartTime }}"
+          # Dynamic fields from range - service names
+          - range: .Payload.Services
+            type: mrkdwn
+            text: "*{{ .Name }}:*"
+          # Dynamic fields from range - service status
+          - range: .Payload.Services
+            type: plain_text
+            text: "{{ .Status }} {{ .Version }}"
+      - type: context
+        elements:
+          # Static context
+          - type: mrkdwn
+            text: "Topic: {{ .Topic }} | Type: {{ .Type }}"
+          # Dynamic context from range
+          - range: .Payload.Tags
+            type: mrkdwn
+            text: "{{ .Key }}: {{ .Value }}"
+      - type: actions
+        elements:
+          # Static button
+          - type: button
+            text:
+              type: plain_text
+              text: "View Details"
+            url: "https://nomad.example.com/ui/deployments/{{ .Payload.DeploymentID }}"
+            action_id: "view_deployment"
+          # Dynamic buttons from range
+          - range: .Payload.QuickActions
+            type: button
+            text:
+              type: plain_text
+              text: "{{ .Label }}"
+            url: "{{ .URL }}"
+            action_id: "quick_{{ .ID }}"
+          # Select with mixed static and dynamic options
+          - type: static_select
+            placeholder:
+              type: plain_text
+              text: "Manage service..."
+            action_id: "manage_service"
+            options:
+              # Static option
+              - text:
+                  type: plain_text
+                  text: "All Services"
+                value: "all"
+              # Dynamic options from range
+              - range: .Payload.Services
+                text:
+                  type: plain_text
+                  text: "{{ .Name }} ({{ .Status }})"
+                value: "service_{{ .ID }}"
+              # Another static option
+              - text:
+                  type: plain_text
+                  text: "Other Actions..."
+                value: "other"
+                
+  slack_node_events:
+    type: slack
+    webhook_url: "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK"
+    channel: "#infrastructure"
+    blocks:
+      - type: header
+        text: "📡 Node Event: {{ .Type }}"
+      - type: section
+        text:
+          type: mrkdwn
+          text: "*Node:* {{ .Payload.Node.Name }}\n*Datacenter:* {{ .Payload.Node.Datacenter }}\n*Status:* {{ .Payload.Node.Status }}"
+        fields:
+          - type: mrkdwn
+            text: "*Node ID:*"
+          - type: plain_text
+            text: "{{ .Payload.Node.ID }}"
+          - type: mrkdwn
+            text: "*Address:*"
+          - type: plain_text
+            text: "{{ .Payload.Node.HTTPAddr }}"
+      - range: .Payload.Node.Attributes
+        type: context
+        elements:
+          - type: mrkdwn
+            text: "• {{ .Key }}: {{ .Value }}"
 
 routes:
   # Send all events to stdout
@@ -85,3 +187,11 @@ routes:
   # Extract topic and type from job events with jq
   - filter: event.Topic == 'Job'
     output: exec_simple
+    
+  # Send deployment events to BlockKit Slack output
+  - filter: event.Topic == 'Deployment'
+    output: slack_blockkit_deployments
+    
+  # Send node events to BlockKit Slack output with rich formatting
+  - filter: event.Topic == 'Node'
+    output: slack_node_events

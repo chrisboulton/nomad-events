@@ -4,7 +4,11 @@
       "Bash(go mod:*)",
       "Bash(mkdir:*)",
       "Bash(go build:*)",
-      "Bash(go doc:*)"
+      "Bash(go doc:*)",
+      "Bash(go test:*)",
+      "WebFetch(domain:pkg.go.dev)",
+      "Bash(go get:*)",
+      "Bash(grep:*)"
     ],
     "deny": [],
     "ask": []

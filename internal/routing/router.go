@@ -21,7 +21,7 @@ type rule struct {
 
 func NewRouter(routes []config.Route) (*Router, error) {
 	env, err := cel.NewEnv(
-		cel.Variable("event", cel.ObjectType("nomad.Event")),
+		cel.Variable("event", cel.MapType(cel.StringType, cel.DynType)),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create CEL environment: %w", err)
@@ -79,7 +79,7 @@ func (r *Router) Route(event nomad.Event) ([]string, error) {
 			"event": eventMap,
 		})
 		if err != nil {
-			return nil, fmt.Errorf("failed to evaluate filter: %w", err)
+			continue
 		}
 
 		if result == types.True {
