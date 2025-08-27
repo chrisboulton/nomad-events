@@ -35,6 +35,9 @@ func mapBlockConfig(config map[string]interface{}) BlockConfig {
 	if v, ok := config["type"].(string); ok {
 		block.Type = v
 	}
+	if v, ok := config["condition"].(string); ok {
+		block.Condition = v
+	}
 	if v, ok := config["text"]; ok {
 		block.Text = v
 	}

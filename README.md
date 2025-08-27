@@ -86,7 +86,9 @@ slack_deployments:
   webhook_url: "https://hooks.slack.com/services/..."
   channel: "#deployments"
   blocks:
-    - type: header
+    # Conditional block - only for deployment events
+    - condition: "event.Topic == 'Deployment'"
+      type: header
       text: "🚀 Deployment: {{ .Payload.DeploymentID }}"
     - type: section
       text:
@@ -97,6 +99,13 @@ slack_deployments:
           text: "*Started:*"
         - type: plain_text
           text: "{{ .Payload.StartTime }}"
+        # Conditional field - only if there are failures
+        - condition: "event.Payload.Failed > 0"
+          type: mrkdwn
+          text: "*Failures:*"
+        - condition: "event.Payload.Failed > 0"
+          type: plain_text
+          text: "{{ .Payload.Failed }}"
     - type: actions
       elements:
         - type: button
@@ -104,7 +113,16 @@ slack_deployments:
             type: plain_text
             text: "View Details"
           url: "https://nomad.example.com/ui/deployments/{{ .Payload.DeploymentID }}"
+        # Conditional element - failure investigation button
+        - condition: "event.Payload.Failed > 0"
+          type: button
+          text:
+            type: plain_text
+            text: "Investigate Failures"
+          url: "https://nomad.example.com/ui/deployments/{{ .Payload.DeploymentID }}/failures"
+    # Conditional range - only show running services
     - range: .Payload.Services
+      condition: "event.Status == 'running'"
       type: context
       elements:
         - type: mrkdwn
@@ -123,6 +141,7 @@ slack_deployments:
 - Full Go template syntax with event data interpolation
 - Custom `range` directive for iterating over arrays at block and property level
 - Mixed static and dynamic content in all array properties
+- **Conditional formatting** using CEL expressions for blocks, fields, elements, and options
 - Template functions: `upper`, `lower`, `title`
 - Nomad API helper functions for retrieving job and cluster information
 - Graceful fallback to simple message format on errors
@@ -173,6 +192,101 @@ The `range` directive now works within any array property, allowing you to mix s
       text: "{{ .Name }} ({{ .Status }})"
       value: "item_{{ .ID }}"
 ```
+
+**Conditional Formatting:**
+The `condition` property allows blocks, fields, elements, and options to be conditionally included based on CEL expressions:
+
+```yaml
+blocks:
+  # Conditional block - only shows for Deployment events
+  - condition: "event.Topic == 'Deployment'"
+    type: header
+    text: "🚀 Deployment: {{ .Payload.DeploymentID }}"
+  
+  # Section with conditional fields
+  - type: section
+    text:
+      type: mrkdwn
+      text: "*Event Details:*"
+    fields:
+      # Always included
+      - type: mrkdwn
+        text: "*Topic:*"
+      - type: plain_text
+        text: "{{ .Topic }}"
+      # Only included if StartTime field exists
+      - condition: "has(event.Payload.StartTime)"
+        type: mrkdwn
+        text: "*Started:*"
+      - condition: "has(event.Payload.StartTime)"
+        type: plain_text
+        text: "{{ .Payload.StartTime }}"
+  
+  # Actions with conditional elements
+  - type: actions
+    elements:
+      # Always included
+      - type: button
+        text:
+          type: plain_text
+          text: "View Details"
+        url: "https://nomad.example.com/ui/jobs/{{ .Payload.Job.ID }}"
+      # Only included if there are failures
+      - condition: "event.Payload.Failed > 0"
+        type: button
+        text:
+          type: plain_text
+          text: "View Failures"
+        url: "https://nomad.example.com/ui/jobs/{{ .Payload.Job.ID }}/failures"
+```
+
+**Conditional with Range:**
+Conditions work seamlessly with range directives:
+
+```yaml
+# Show only running services
+- type: section
+  text: "Running Services:"
+  fields:
+    - range: .Payload.Services
+      condition: "event.Status == 'running'" # event refers to the current item in range
+      type: mrkdwn
+      text: "*{{ .Name }}:* {{ .Status }}"
+
+# Mixed conditional and non-conditional options
+- type: static_select
+  placeholder:
+    type: plain_text
+    text: "Select action..."
+  options:
+    # Static option
+    - text:
+        type: plain_text
+        text: "View All"
+      value: "all"
+    # Conditional options from range
+    - range: .Payload.Actions
+      condition: "event.Enabled == true" # Only include enabled actions
+      text:
+        type: plain_text
+        text: "{{ .Label }}"
+      value: "action_{{ .ID }}"
+```
+
+**Condition Expression Syntax:**
+Conditions use CEL (Common Expression Language) with access to full event data:
+
+- `event.Topic == 'Node'` - Check event topic
+- `event.Type == 'JobRegistered'` - Check event type  
+- `has(event.Payload.StartTime)` - Check if field exists
+- `event.Payload.Failed > 0` - Numeric comparisons
+- `event.Topic == 'Job' && event.Type == 'JobFailed'` - Complex conditions with AND/OR
+- `event.Payload.Node.Name in ['worker-1', 'worker-2']` - Check if value is in list
+
+**Error Handling:**
+- Invalid conditions gracefully degrade to always include the item
+- Missing CEL environment falls back to including all items
+- Condition evaluation errors are logged but don't break message formatting
 
 #### http
 Sends events via HTTP requests.

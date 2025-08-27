@@ -8,27 +8,31 @@ import (
 	"nomad-events/internal/nomad"
 	"nomad-events/internal/template"
 
+	"github.com/google/cel-go/cel"
+	"github.com/google/cel-go/common/types"
 	"github.com/hashicorp/nomad/api"
 	"github.com/slack-go/slack"
 )
 
 type SlackTemplateEngine struct {
 	engine *template.Engine
+	celEnv *cel.Env
 }
 
 type BlockConfig struct {
-	Type     string        `yaml:"type"`
-	Text     interface{}   `yaml:"text,omitempty"`
-	Fields   []interface{} `yaml:"fields,omitempty"`
-	Elements []interface{} `yaml:"elements,omitempty"`
-	Options  []interface{} `yaml:"options,omitempty"`
-	ImageURL string        `yaml:"image_url,omitempty"`
-	AltText  string        `yaml:"alt_text,omitempty"`
-	Title    interface{}   `yaml:"title,omitempty"`
-	Label    interface{}   `yaml:"label,omitempty"`
-	Hint     interface{}   `yaml:"hint,omitempty"`
-	Optional bool          `yaml:"optional,omitempty"`
-	BlockID  string        `yaml:"block_id,omitempty"`
+	Type      string        `yaml:"type"`
+	Condition string        `yaml:"condition,omitempty"`
+	Text      interface{}   `yaml:"text,omitempty"`
+	Fields    []interface{} `yaml:"fields,omitempty"`
+	Elements  []interface{} `yaml:"elements,omitempty"`
+	Options   []interface{} `yaml:"options,omitempty"`
+	ImageURL  string        `yaml:"image_url,omitempty"`
+	AltText   string        `yaml:"alt_text,omitempty"`
+	Title     interface{}   `yaml:"title,omitempty"`
+	Label     interface{}   `yaml:"label,omitempty"`
+	Hint      interface{}   `yaml:"hint,omitempty"`
+	Optional  bool          `yaml:"optional,omitempty"`
+	BlockID   string        `yaml:"block_id,omitempty"`
 }
 
 type TextConfig struct {
@@ -53,8 +57,18 @@ type OptionConfig struct {
 }
 
 func NewSlackTemplateEngine(nomadClient *api.Client) *SlackTemplateEngine {
+	// Create CEL environment for condition evaluation
+	celEnv, err := cel.NewEnv(
+		cel.Variable("event", cel.MapType(cel.StringType, cel.DynType)),
+	)
+	if err != nil {
+		// If CEL environment creation fails, continue without conditional support
+		celEnv = nil
+	}
+
 	return &SlackTemplateEngine{
 		engine: template.NewEngine(nomadClient),
+		celEnv: celEnv,
 	}
 }
 
@@ -64,9 +78,18 @@ func (ste *SlackTemplateEngine) ProcessBlocks(blockConfigs []BlockConfig, event 
 	eventData := ste.engine.CreateTemplateData(event)
 
 	for _, blockConfig := range blockConfigs {
+		// Check condition before processing block
+		if !ste.evaluateCondition(blockConfig.Condition, eventData) {
+			continue
+		}
+
 		if isRange, rangePath := ste.isRangeItem(blockConfig); isRange {
 			expandedBlocks, err := ste.expandRangeItem(blockConfig, rangePath, eventData, func(templateItem interface{}, itemData map[string]interface{}) (interface{}, error) {
 				if blockConfig, ok := templateItem.(BlockConfig); ok {
+					// Check condition for each expanded block too
+					if !ste.evaluateCondition(blockConfig.Condition, itemData) {
+						return nil, nil // Skip this block
+					}
 					return ste.processBlock(blockConfig, itemData)
 				}
 				return nil, fmt.Errorf("invalid block config type")
@@ -156,6 +179,13 @@ func (ste *SlackTemplateEngine) processFields(fieldsConfig []interface{}, eventD
 	var fields []*slack.TextBlockObject
 
 	for _, field := range fieldsConfig {
+		// Check condition before processing field
+		if hasCondition, condition := ste.isConditionItem(field); hasCondition {
+			if !ste.evaluateCondition(condition, eventData) {
+				continue
+			}
+		}
+
 		if isRange, rangePath := ste.isRangeItem(field); isRange {
 			expandedFields, err := ste.expandRangeItem(field, rangePath, eventData, ste.processTextField)
 			if err != nil {
@@ -178,6 +208,12 @@ func (ste *SlackTemplateEngine) processFields(fieldsConfig []interface{}, eventD
 }
 
 func (ste *SlackTemplateEngine) processTextField(templateItem interface{}, itemData map[string]interface{}) (interface{}, error) {
+	// Check condition for range-expanded fields
+	if hasCondition, condition := ste.isConditionItem(templateItem); hasCondition {
+		if !ste.evaluateCondition(condition, itemData) {
+			return nil, nil // Skip this field
+		}
+	}
 	return ste.processSingleTextField(templateItem, itemData)
 }
 
@@ -202,6 +238,13 @@ func (ste *SlackTemplateEngine) processContextElements(elementsConfig []interfac
 	var elements []slack.MixedElement
 
 	for _, elem := range elementsConfig {
+		// Check condition before processing element
+		if hasCondition, condition := ste.isConditionItem(elem); hasCondition {
+			if !ste.evaluateCondition(condition, eventData) {
+				continue
+			}
+		}
+
 		if isRange, rangePath := ste.isRangeItem(elem); isRange {
 			expandedElements, err := ste.expandRangeItem(elem, rangePath, eventData, ste.processContextElement)
 			if err != nil {
@@ -224,6 +267,12 @@ func (ste *SlackTemplateEngine) processContextElements(elementsConfig []interfac
 }
 
 func (ste *SlackTemplateEngine) processContextElement(templateItem interface{}, itemData map[string]interface{}) (interface{}, error) {
+	// Check condition for range-expanded elements
+	if hasCondition, condition := ste.isConditionItem(templateItem); hasCondition {
+		if !ste.evaluateCondition(condition, itemData) {
+			return nil, nil // Skip this element
+		}
+	}
 	return ste.processSingleContextElement(templateItem, itemData)
 }
 
@@ -248,6 +297,13 @@ func (ste *SlackTemplateEngine) processActionElements(elementsConfig []interface
 	var elements []slack.BlockElement
 
 	for _, elem := range elementsConfig {
+		// Check condition before processing element
+		if hasCondition, condition := ste.isConditionItem(elem); hasCondition {
+			if !ste.evaluateCondition(condition, eventData) {
+				continue
+			}
+		}
+
 		if isRange, rangePath := ste.isRangeItem(elem); isRange {
 			expandedElements, err := ste.expandRangeItem(elem, rangePath, eventData, ste.processActionElement)
 			if err != nil {
@@ -270,6 +326,12 @@ func (ste *SlackTemplateEngine) processActionElements(elementsConfig []interface
 }
 
 func (ste *SlackTemplateEngine) processActionElement(templateItem interface{}, itemData map[string]interface{}) (interface{}, error) {
+	// Check condition for range-expanded elements
+	if hasCondition, condition := ste.isConditionItem(templateItem); hasCondition {
+		if !ste.evaluateCondition(condition, itemData) {
+			return nil, nil // Skip this element
+		}
+	}
 	return ste.processSingleActionElement(templateItem, itemData)
 }
 
@@ -391,6 +453,13 @@ func (ste *SlackTemplateEngine) processSelectOptions(optionsConfig []interface{}
 	var options []*slack.OptionBlockObject
 
 	for _, option := range optionsConfig {
+		// Check condition before processing option
+		if hasCondition, condition := ste.isConditionItem(option); hasCondition {
+			if !ste.evaluateCondition(condition, eventData) {
+				continue
+			}
+		}
+
 		if isRange, rangePath := ste.isRangeItem(option); isRange {
 			expandedOptions, err := ste.expandRangeItem(option, rangePath, eventData, ste.processSelectOption)
 			if err != nil {
@@ -413,6 +482,12 @@ func (ste *SlackTemplateEngine) processSelectOptions(optionsConfig []interface{}
 }
 
 func (ste *SlackTemplateEngine) processSelectOption(templateItem interface{}, itemData map[string]interface{}) (interface{}, error) {
+	// Check condition for range-expanded options
+	if hasCondition, condition := ste.isConditionItem(templateItem); hasCondition {
+		if !ste.evaluateCondition(condition, itemData) {
+			return nil, nil // Skip this option
+		}
+	}
 	return ste.processSingleSelectOption(templateItem, itemData)
 }
 
@@ -602,4 +677,53 @@ func (ste *SlackTemplateEngine) expandRangeItem(
 	}
 
 	return results, nil
+}
+
+// evaluateCondition evaluates a CEL condition expression against event data
+func (ste *SlackTemplateEngine) evaluateCondition(condition string, eventData map[string]interface{}) bool {
+	// If no condition specified, always include
+	if condition == "" {
+		return true
+	}
+
+	// If CEL environment is not available, always include (graceful degradation)
+	if ste.celEnv == nil {
+		return true
+	}
+
+	// Compile the condition
+	ast, issues := ste.celEnv.Compile(condition)
+	if issues.Err() != nil {
+		// If compilation fails, log and include (graceful degradation)
+		return true
+	}
+
+	// Create program
+	program, err := ste.celEnv.Program(ast)
+	if err != nil {
+		// If program creation fails, log and include
+		return true
+	}
+
+	// Evaluate condition
+	result, _, err := program.Eval(map[string]interface{}{
+		"event": eventData,
+	})
+	if err != nil {
+		// If evaluation fails, log and include
+		return true
+	}
+
+	// Return true if condition evaluates to true
+	return result == types.True
+}
+
+// isConditionItem checks if an item has a condition field
+func (ste *SlackTemplateEngine) isConditionItem(item interface{}) (bool, string) {
+	if itemMap, ok := item.(map[string]interface{}); ok {
+		if condition, exists := itemMap["condition"].(string); exists {
+			return true, condition
+		}
+	}
+	return false, ""
 }
