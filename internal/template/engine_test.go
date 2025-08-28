@@ -11,18 +11,18 @@ import (
 )
 
 func TestNewEngine(t *testing.T) {
-	t.Run("without nomad client", func(t *testing.T) {
-		engine := NewEngine(nil)
+	t.Run("basic engine", func(t *testing.T) {
+		engine := NewEngine()
 		assert.NotNil(t, engine)
 		assert.NotNil(t, engine.funcMap)
 		assert.Nil(t, engine.nomadClient)
 	})
 
-	t.Run("with nomad client", func(t *testing.T) {
+	t.Run("engine with nomad client", func(t *testing.T) {
 		client, err := api.NewClient(api.DefaultConfig())
 		require.NoError(t, err)
 
-		engine := NewEngine(client)
+		engine := NewEngineWithNomad(client)
 		assert.NotNil(t, engine)
 		assert.NotNil(t, engine.funcMap)
 		assert.Equal(t, client, engine.nomadClient)
@@ -30,7 +30,7 @@ func TestNewEngine(t *testing.T) {
 }
 
 func TestEngineProcessText(t *testing.T) {
-	engine := NewEngine(nil)
+	engine := NewEngine()
 
 	event := nomad.Event{
 		Topic:     "Job",
@@ -78,7 +78,7 @@ func TestEngineProcessText(t *testing.T) {
 }
 
 func TestEngineCreateTemplateData(t *testing.T) {
-	engine := NewEngine(nil)
+	engine := NewEngine()
 
 	event := nomad.Event{
 		Topic:     "Job",
@@ -109,7 +109,7 @@ func TestEngineCreateTemplateData(t *testing.T) {
 
 func TestEngineNomadAPIFunctions(t *testing.T) {
 	t.Run("without nomad client", func(t *testing.T) {
-		engine := NewEngine(nil)
+		engine := NewEngine()
 
 		// Test that functions return nil when client is nil
 		job, err := engine.jobFunc("test-job")

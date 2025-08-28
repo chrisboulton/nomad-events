@@ -1,0 +1,63 @@
+nomad:
+  address: "http://localhost:4646"
+  token: ""
+
+outputs:
+  stdout_json:
+    type: stdout
+    format: json
+  stdout_node_events:
+    type: stdout
+    format: text
+    text: "💻 {{ .Topic }}/{{ .Type }}: {{ .Payload.Node.Name }}"
+  stdout_deployment_plan_result_running:
+    type: stdout
+    format: text
+    text: |
+      🚀 {{ .Topic }}/{{ .Type }}: {{ .Payload.Deployment.JobID }}
+      {{ range $k, $v := .Payload.Deployment.TaskGroups }}
+        {{ $k }}: {{ add $v.HealthyAllocs $v.UnhealthyAllocs }} -> {{ $v.DesiredTotal }}
+      {{ end }}
+  stdout_job_registered_scaled_event:
+    type: stdout
+    format: text
+    text: |
+      🚀 {{ .Payload.Job.ID }} was scaled:
+      {{- range $tg := .Diff.TaskGroups -}}
+        {{- range $v := $tg.Fields }}
+          {{ if eq $v.Name "Count" }} {{ $tg.Name }} {{ $v.Old }} -> {{ $v.New }} {{ end }}
+        {{- end }}
+      {{- end }}
+  stdout_job_registered_event:
+    type: stdout
+    format: text
+    text: |
+      🚀 {{ .Payload.Job.ID }} was registered
+  stdout_job_deregistered_event:
+    type: stdout
+    format: text
+    text: |
+      🚀 {{ .Payload.Job.ID }} was deregistered
+  stdout_deployment_promotion_event:
+    type: stdout
+    format: text
+    text: |
+      🚀 {{ .Payload.Deployment.JobID }} was promoted
+routes:
+  - filter: ""
+    output: stdout_json
+  - filter: event.Type == 'JobRegistered' && event.Job.Version == 1
+    output: stdout_job_registered_event
+  - filter: event.Type == 'JobDeregistered'
+    output: stdout_job_deregistered_event
+  - filter: |
+      event.Type == 'JobRegistered' &&
+      diff.TaskGroups.exists(tg,
+        tg.Fields.exists(f,
+          f.Name == "Count" &&
+          int(f.New) != int(f.Old)
+        )
+      )
+    output: stdout_job_registered_scaled_event
+  - filter: event.Type == 'DeploymentPromotion'
+    output: stdout_deployment_promotion_event

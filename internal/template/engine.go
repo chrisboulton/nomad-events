@@ -15,7 +15,15 @@ type Engine struct {
 	nomadClient *api.Client
 }
 
-func NewEngine(nomadClient *api.Client) *Engine {
+// NewEngine creates a template engine without Nomad API functions
+func NewEngine() *Engine {
+	return &Engine{
+		funcMap: sprig.FuncMap(),
+	}
+}
+
+// NewEngineWithNomad creates a template engine with Nomad API functions
+func NewEngineWithNomad(nomadClient *api.Client) *Engine {
 	e := &Engine{
 		funcMap:     sprig.FuncMap(),
 		nomadClient: nomadClient,

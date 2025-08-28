@@ -301,13 +301,39 @@ Sends events via HTTP requests.
 - `timeout`: Request timeout in seconds (default: 10)
 
 #### rabbitmq
-Publishes events to RabbitMQ.
+Publishes events to RabbitMQ with support for Go templating in routing key names.
 - `url`: AMQP connection URL (required)
-- `exchange`: Exchange name
-- `routing_key`: Routing key pattern
-- `queue`: Queue name
+- `exchange`: Exchange name (static)
+- `routing_key`: Routing key template (supports Go templating, default: "nomad.{{ .Topic }}.{{ .Type }}")
+- `queue`: Queue name (static)
 - `durable`: Durable queues/exchanges (default: true)
 - `auto_delete`: Auto-delete queues/exchanges (default: false)
+
+**Routing Key Templates:**
+The routing key supports Go template syntax with event data for dynamic message routing:
+
+```yaml
+rabbitmq_dynamic:
+  type: rabbitmq
+  url: "amqp://guest:guest@localhost:5672/"
+  exchange: "nomad"
+  queue: "events"
+  routing_key: "{{ .Topic }}.{{ .Type }}.{{ .Payload.Job.Namespace | default \"default\" }}"
+```
+
+**Available Template Data:**
+- `{{ .Topic }}`: Event topic (Node, Job, Allocation, etc.)
+- `{{ .Type }}`: Event type (JobRegistered, NodeRegistration, etc.)
+- `{{ .Key }}`: Event key
+- `{{ .Namespace }}`: Nomad namespace
+- `{{ .Index }}`: Event index
+- `{{ .Payload }}`: Full event payload with job/node/allocation data
+
+**Template Features:**
+- Full Go template syntax with sprig functions (`upper`, `lower`, `title`, etc.)
+- Automatic whitespace trimming for routing key names
+- Graceful fallback to original template on errors
+- Static exchange and queue names for infrastructure simplicity
 
 #### exec
 Executes a command with event data passed via stdin as JSON.

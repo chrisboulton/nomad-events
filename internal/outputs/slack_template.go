@@ -67,7 +67,7 @@ func NewSlackTemplateEngine(nomadClient *api.Client) *SlackTemplateEngine {
 	}
 
 	return &SlackTemplateEngine{
-		engine: template.NewEngine(nomadClient),
+		engine: template.NewEngineWithNomad(nomadClient),
 		celEnv: celEnv,
 	}
 }

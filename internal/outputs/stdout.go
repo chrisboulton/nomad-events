@@ -34,7 +34,7 @@ func NewStdoutOutput(config map[string]interface{}, nomadClient *api.Client) (*S
 		if textTemplate == "" {
 			return nil, fmt.Errorf("text template is required when format is 'text'")
 		}
-		templateEngine = template.NewEngine(nomadClient)
+		templateEngine = template.NewEngineWithNomad(nomadClient)
 	}
 
 	return &StdoutOutput{

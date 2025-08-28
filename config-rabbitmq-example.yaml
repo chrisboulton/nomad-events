@@ -1,0 +1,53 @@
+nomad:
+  address: "http://localhost:4646"
+  token: ""
+
+outputs:
+  # Basic RabbitMQ with default routing
+  rabbitmq_basic:
+    type: rabbitmq
+    url: "amqp://guest:guest@localhost:5672/"
+    exchange: "nomad"
+    queue: "events"
+    # routing_key defaults to "nomad.{{ .Topic }}.{{ .Type }}"
+
+  # Dynamic routing key with static infrastructure
+  rabbitmq_dynamic:
+    type: rabbitmq
+    url: "amqp://guest:guest@localhost:5672/"
+    exchange: "nomad"
+    queue: "events"
+    routing_key: "{{ .Topic | lower }}.{{ .Type | lower }}"
+
+  # Job-specific routing
+  rabbitmq_jobs:
+    type: rabbitmq
+    url: "amqp://guest:guest@localhost:5672/"
+    exchange: "nomad-jobs"
+    queue: "job-events"
+    routing_key: "job.{{ .Payload.Job.ID }}.{{ .Type }}"
+
+  # Namespace-aware routing
+  rabbitmq_namespaced:
+    type: rabbitmq
+    url: "amqp://guest:guest@localhost:5672/"
+    exchange: "nomad"
+    queue: "namespaced-events"
+    routing_key: "{{ .Payload.Job.Namespace | default \"default\" }}.{{ .Topic }}.{{ .Type }}"
+
+routes:
+  # Route all events to basic exchange
+  - filter: ""
+    output: rabbitmq_basic
+
+  # Route job events to job-specific queues
+  - filter: event.Topic == 'Job'
+    output: rabbitmq_jobs
+
+  # Route node events to dynamic routing
+  - filter: event.Topic == 'Node'
+    output: rabbitmq_dynamic
+
+  # Route deployment events with namespace awareness
+  - filter: event.Topic == 'Deployment'
+    output: rabbitmq_namespaced
