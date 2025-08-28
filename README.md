@@ -5,6 +5,7 @@ A Go service that connects to the Nomad HTTP events streaming API, processes eve
 ## Features
 
 - **Nomad Event Streaming**: Connects to Nomad's event stream API with automatic reconnection and backoff
+- **Secure Connections**: HTTPS/TLS support with custom CA certificates and mutual TLS (mTLS) authentication
 - **Hierarchical Routing**: CEL-based expression filtering with unlimited depth child routes (AlertManager-style)
 - **Multiple Output Types**: Support for stdout, Slack, HTTP webhooks, RabbitMQ, and command execution  
 - **Hot Configuration Reload**: Reload routing and output configuration via SIGHUP without restart
@@ -34,6 +35,70 @@ routes:
   - filter: event.Topic == 'Node'
     output: slack_alerts
 ```
+
+### Nomad Connection
+
+#### Basic HTTP Connection
+```yaml
+nomad:
+  address: "http://localhost:4646"
+  token: "your-nomad-token"  # Optional ACL token
+```
+
+#### HTTPS with Custom CA Certificate
+For secure connections to Nomad clusters with custom certificate authorities:
+
+```yaml
+nomad:
+  address: "https://nomad.example.com:4646"
+  token: "your-nomad-token"
+  tls:
+    enabled: true
+    ca_cert: "/etc/ssl/certs/nomad-ca.pem"
+    server_name: "nomad.example.com"  # Optional: override server name for verification
+```
+
+#### Mutual TLS (mTLS)
+For environments requiring client certificate authentication:
+
+```yaml
+nomad:
+  address: "https://nomad.example.com:4646"
+  token: "your-nomad-token"
+  tls:
+    enabled: true
+    ca_cert: "/etc/ssl/certs/nomad-ca.pem"
+    client_cert: "/etc/ssl/certs/nomad-client.pem"
+    client_key: "/etc/ssl/private/nomad-client-key.pem"
+    server_name: "nomad.example.com"
+```
+
+#### Development/Testing
+For development environments with self-signed certificates (not recommended for production):
+
+```yaml
+nomad:
+  address: "https://nomad.example.com:4646"
+  token: "your-nomad-token"
+  tls:
+    enabled: true
+    insecure_skip_verify: true  # WARNING: Skips certificate verification
+```
+
+**TLS Configuration Options:**
+- `enabled`: Enable TLS connection (required for HTTPS)
+- `ca_cert`: Path to custom CA certificate file (optional)
+- `client_cert`: Path to client certificate file for mTLS (optional)
+- `client_key`: Path to client private key file for mTLS (optional)
+- `server_name`: Server name for certificate verification (optional)
+- `insecure_skip_verify`: Skip certificate verification (development only)
+
+**Certificate Requirements:**
+- CA certificate: Must be in PEM format
+- Client certificate: Must be in PEM format (for mTLS)
+- Client key: Must be in PEM format and accessible by the service
+- All certificate files must exist and be readable at startup
+- Client certificate and key must both be provided together for mTLS
 
 ### Output Types
 

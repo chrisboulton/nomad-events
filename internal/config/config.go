@@ -14,8 +14,18 @@ type Config struct {
 }
 
 type NomadConfig struct {
-	Address string `yaml:"address"`
-	Token   string `yaml:"token"`
+	Address string     `yaml:"address"`
+	Token   string     `yaml:"token"`
+	TLS     *TLSConfig `yaml:"tls,omitempty"`
+}
+
+type TLSConfig struct {
+	Enabled            bool   `yaml:"enabled"`
+	CACert             string `yaml:"ca_cert,omitempty"`              // Path to CA certificate file
+	ClientCert         string `yaml:"client_cert,omitempty"`          // Path to client certificate file
+	ClientKey          string `yaml:"client_key,omitempty"`           // Path to client key file
+	ServerName         string `yaml:"server_name,omitempty"`          // Override server name for verification
+	InsecureSkipVerify bool   `yaml:"insecure_skip_verify,omitempty"` // Skip certificate verification (dev only)
 }
 
 type Output struct {
@@ -57,6 +67,11 @@ func LoadConfig(path string) (*Config, error) {
 func (c *Config) validate() error {
 	if c.Nomad.Address == "" {
 		return fmt.Errorf("nomad.address is required - please specify the Nomad API address (e.g., \"http://localhost:4646\")")
+	}
+
+	// Validate TLS configuration
+	if err := c.validateTLS(); err != nil {
+		return err
 	}
 
 	if len(c.Outputs) == 0 {
@@ -113,6 +128,47 @@ func (c *Config) validateRoute(route Route, path string) error {
 		childPath := fmt.Sprintf("%s.routes[%d]", path, i)
 		if err := c.validateRoute(childRoute, childPath); err != nil {
 			return err
+		}
+	}
+
+	return nil
+}
+
+// validateTLS validates TLS configuration
+func (c *Config) validateTLS() error {
+	if c.Nomad.TLS == nil || !c.Nomad.TLS.Enabled {
+		return nil
+	}
+
+	tls := c.Nomad.TLS
+
+	// Validate client certificate configuration
+	if (tls.ClientCert == "" && tls.ClientKey != "") || (tls.ClientCert != "" && tls.ClientKey == "") {
+		return fmt.Errorf("nomad.tls: both client_cert and client_key must be provided together for mutual TLS")
+	}
+
+	// Validate certificate files exist if specified
+	if tls.CACert != "" {
+		if _, err := os.Stat(tls.CACert); os.IsNotExist(err) {
+			return fmt.Errorf("nomad.tls.ca_cert: file does not exist: %s", tls.CACert)
+		} else if err != nil {
+			return fmt.Errorf("nomad.tls.ca_cert: cannot access file %s: %w", tls.CACert, err)
+		}
+	}
+
+	if tls.ClientCert != "" {
+		if _, err := os.Stat(tls.ClientCert); os.IsNotExist(err) {
+			return fmt.Errorf("nomad.tls.client_cert: file does not exist: %s", tls.ClientCert)
+		} else if err != nil {
+			return fmt.Errorf("nomad.tls.client_cert: cannot access file %s: %w", tls.ClientCert, err)
+		}
+	}
+
+	if tls.ClientKey != "" {
+		if _, err := os.Stat(tls.ClientKey); os.IsNotExist(err) {
+			return fmt.Errorf("nomad.tls.client_key: file does not exist: %s", tls.ClientKey)
+		} else if err != nil {
+			return fmt.Errorf("nomad.tls.client_key: cannot access file %s: %w", tls.ClientKey, err)
 		}
 	}
 

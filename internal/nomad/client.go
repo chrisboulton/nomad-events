@@ -7,6 +7,8 @@ import (
 	"log/slog"
 	"time"
 
+	"nomad-events/internal/config"
+
 	"github.com/hashicorp/nomad/api"
 )
 
@@ -27,14 +29,19 @@ type EventStream struct {
 	maxRetries   int
 }
 
-func NewEventStream(address, token string) (*EventStream, error) {
-	config := api.DefaultConfig()
-	config.Address = address
-	if token != "" {
-		config.SecretID = token
+func NewEventStream(nomadConfig config.NomadConfig) (*EventStream, error) {
+	apiConfig := api.DefaultConfig()
+	apiConfig.Address = nomadConfig.Address
+	if nomadConfig.Token != "" {
+		apiConfig.SecretID = nomadConfig.Token
 	}
 
-	client, err := api.NewClient(config)
+	// Configure TLS if specified
+	if err := configureTLS(apiConfig, nomadConfig.TLS); err != nil {
+		return nil, fmt.Errorf("failed to configure TLS: %w", err)
+	}
+
+	client, err := api.NewClient(apiConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Nomad client: %w", err)
 	}
@@ -44,6 +51,49 @@ func NewEventStream(address, token string) (*EventStream, error) {
 		retryBackoff: time.Second,
 		maxRetries:   10,
 	}, nil
+}
+
+// configureTLS configures TLS settings for the Nomad API client
+func configureTLS(apiConfig *api.Config, tlsConfig *config.TLSConfig) error {
+	if tlsConfig == nil || !tlsConfig.Enabled {
+		return nil
+	}
+
+	// Initialize TLS config if not present
+	if apiConfig.TLSConfig == nil {
+		apiConfig.TLSConfig = &api.TLSConfig{}
+	}
+
+	// Set certificate paths
+	if tlsConfig.CACert != "" {
+		apiConfig.TLSConfig.CACert = tlsConfig.CACert
+	}
+	
+	if tlsConfig.ClientCert != "" {
+		apiConfig.TLSConfig.ClientCert = tlsConfig.ClientCert
+	}
+	
+	if tlsConfig.ClientKey != "" {
+		apiConfig.TLSConfig.ClientKey = tlsConfig.ClientKey
+	}
+	
+	if tlsConfig.ServerName != "" {
+		apiConfig.TLSConfig.TLSServerName = tlsConfig.ServerName
+	}
+	
+	if tlsConfig.InsecureSkipVerify {
+		apiConfig.TLSConfig.Insecure = true
+		slog.Warn("TLS certificate verification disabled - not recommended for production", 
+			"nomad_address", apiConfig.Address)
+	}
+
+	slog.Info("TLS configuration applied for Nomad client", 
+		"ca_cert_configured", tlsConfig.CACert != "",
+		"client_cert_configured", tlsConfig.ClientCert != "",
+		"server_name", tlsConfig.ServerName,
+		"skip_verify", tlsConfig.InsecureSkipVerify)
+
+	return nil
 }
 
 func (es *EventStream) Stream(ctx context.Context, eventChan chan<- Event) error {

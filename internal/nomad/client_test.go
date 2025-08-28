@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"nomad-events/internal/config"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -12,33 +14,61 @@ import (
 func TestNewEventStream(t *testing.T) {
 	tests := []struct {
 		name        string
-		address     string
-		token       string
+		nomadConfig config.NomadConfig
 		expectError bool
 	}{
 		{
-			name:        "valid address without token",
-			address:     "http://localhost:4646",
-			token:       "",
+			name: "valid address without token",
+			nomadConfig: config.NomadConfig{
+				Address: "http://localhost:4646",
+				Token:   "",
+			},
 			expectError: false,
 		},
 		{
-			name:        "valid address with token",
-			address:     "http://localhost:4646",
-			token:       "test-token",
+			name: "valid address with token",
+			nomadConfig: config.NomadConfig{
+				Address: "http://localhost:4646",
+				Token:   "test-token",
+			},
 			expectError: false,
 		},
 		{
-			name:        "invalid address format still creates client",
-			address:     "not-a-valid-url",
-			token:       "",
+			name: "invalid address format still creates client",
+			nomadConfig: config.NomadConfig{
+				Address: "not-a-valid-url",
+				Token:   "",
+			},
+			expectError: false,
+		},
+		{
+			name: "https address with TLS disabled",
+			nomadConfig: config.NomadConfig{
+				Address: "https://localhost:4646",
+				Token:   "test-token",
+				TLS: &config.TLSConfig{
+					Enabled: false,
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "https address with TLS enabled and insecure skip verify",
+			nomadConfig: config.NomadConfig{
+				Address: "https://localhost:4646",
+				Token:   "test-token",
+				TLS: &config.TLSConfig{
+					Enabled:            true,
+					InsecureSkipVerify: true,
+				},
+			},
 			expectError: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			stream, err := NewEventStream(tt.address, tt.token)
+			stream, err := NewEventStream(tt.nomadConfig)
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -55,7 +85,10 @@ func TestNewEventStream(t *testing.T) {
 }
 
 func TestEventStreamExponentialBackoff(t *testing.T) {
-	stream, err := NewEventStream("http://localhost:4646", "")
+	stream, err := NewEventStream(config.NomadConfig{
+		Address: "http://localhost:4646",
+		Token:   "",
+	})
 	require.NoError(t, err)
 
 	assert.Equal(t, time.Second, stream.retryBackoff)
@@ -182,7 +215,10 @@ func TestEventStreamFetchJobDiff(t *testing.T) {
 	// Note: This test checks the error handling of fetchJobDiff
 	// since we can't mock the Nomad API easily without significant refactoring
 
-	stream, err := NewEventStream("http://localhost:4646", "")
+	stream, err := NewEventStream(config.NomadConfig{
+		Address: "http://localhost:4646",
+		Token:   "",
+	})
 	require.NoError(t, err)
 
 	tests := []struct {

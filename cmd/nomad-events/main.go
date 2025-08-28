@@ -208,7 +208,7 @@ For more information, see: https://github.com/your-repo/nomad-events
 		"nomad_address", cfg.Nomad.Address,
 		"config_path", *configPath)
 
-	eventStream, err := nomad.NewEventStream(cfg.Nomad.Address, cfg.Nomad.Token)
+	eventStream, err := nomad.NewEventStream(cfg.Nomad)
 	if err != nil {
 		slog.Error("Failed to create Nomad event stream", "error", err, "nomad_address", cfg.Nomad.Address)
 		os.Exit(1)

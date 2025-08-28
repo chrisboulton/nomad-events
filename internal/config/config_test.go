@@ -199,3 +199,217 @@ func TestConfigValidation(t *testing.T) {
 		})
 	}
 }
+
+func TestTLSConfigValidation(t *testing.T) {
+	// Create temporary files for testing certificate validation
+	tmpDir := t.TempDir()
+	
+	// Create valid test certificate files
+	caCertPath := filepath.Join(tmpDir, "ca.pem")
+	clientCertPath := filepath.Join(tmpDir, "client.pem")
+	clientKeyPath := filepath.Join(tmpDir, "client-key.pem")
+	
+	err := os.WriteFile(caCertPath, []byte("dummy ca cert"), 0644)
+	require.NoError(t, err)
+	
+	err = os.WriteFile(clientCertPath, []byte("dummy client cert"), 0644)
+	require.NoError(t, err)
+	
+	err = os.WriteFile(clientKeyPath, []byte("dummy client key"), 0600)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name     string
+		config   Config
+		expected string
+	}{
+		{
+			name: "valid TLS config with CA cert",
+			config: Config{
+				Nomad: NomadConfig{
+					Address: "https://localhost:4646",
+					TLS: &TLSConfig{
+						Enabled: true,
+						CACert:  caCertPath,
+					},
+				},
+				Outputs: map[string]Output{
+					"test": {Type: "stdout"},
+				},
+				Routes: []Route{
+					{Filter: "", Output: "test"},
+				},
+			},
+			expected: "",
+		},
+		{
+			name: "valid mTLS config",
+			config: Config{
+				Nomad: NomadConfig{
+					Address: "https://localhost:4646",
+					TLS: &TLSConfig{
+						Enabled:    true,
+						CACert:     caCertPath,
+						ClientCert: clientCertPath,
+						ClientKey:  clientKeyPath,
+						ServerName: "nomad.example.com",
+					},
+				},
+				Outputs: map[string]Output{
+					"test": {Type: "stdout"},
+				},
+				Routes: []Route{
+					{Filter: "", Output: "test"},
+				},
+			},
+			expected: "",
+		},
+		{
+			name: "TLS disabled - no validation",
+			config: Config{
+				Nomad: NomadConfig{
+					Address: "https://localhost:4646",
+					TLS: &TLSConfig{
+						Enabled: false,
+						CACert:  "/non/existent/path",
+					},
+				},
+				Outputs: map[string]Output{
+					"test": {Type: "stdout"},
+				},
+				Routes: []Route{
+					{Filter: "", Output: "test"},
+				},
+			},
+			expected: "",
+		},
+		{
+			name: "missing client key with client cert",
+			config: Config{
+				Nomad: NomadConfig{
+					Address: "https://localhost:4646",
+					TLS: &TLSConfig{
+						Enabled:    true,
+						ClientCert: clientCertPath,
+					},
+				},
+				Outputs: map[string]Output{
+					"test": {Type: "stdout"},
+				},
+				Routes: []Route{
+					{Filter: "", Output: "test"},
+				},
+			},
+			expected: "both client_cert and client_key must be provided together",
+		},
+		{
+			name: "missing client cert with client key",
+			config: Config{
+				Nomad: NomadConfig{
+					Address: "https://localhost:4646",
+					TLS: &TLSConfig{
+						Enabled:   true,
+						ClientKey: clientKeyPath,
+					},
+				},
+				Outputs: map[string]Output{
+					"test": {Type: "stdout"},
+				},
+				Routes: []Route{
+					{Filter: "", Output: "test"},
+				},
+			},
+			expected: "both client_cert and client_key must be provided together",
+		},
+		{
+			name: "non-existent CA cert file",
+			config: Config{
+				Nomad: NomadConfig{
+					Address: "https://localhost:4646",
+					TLS: &TLSConfig{
+						Enabled: true,
+						CACert:  "/non/existent/ca.pem",
+					},
+				},
+				Outputs: map[string]Output{
+					"test": {Type: "stdout"},
+				},
+				Routes: []Route{
+					{Filter: "", Output: "test"},
+				},
+			},
+			expected: "file does not exist: /non/existent/ca.pem",
+		},
+		{
+			name: "non-existent client cert file",
+			config: Config{
+				Nomad: NomadConfig{
+					Address: "https://localhost:4646",
+					TLS: &TLSConfig{
+						Enabled:    true,
+						ClientCert: "/non/existent/client.pem",
+						ClientKey:  clientKeyPath,
+					},
+				},
+				Outputs: map[string]Output{
+					"test": {Type: "stdout"},
+				},
+				Routes: []Route{
+					{Filter: "", Output: "test"},
+				},
+			},
+			expected: "file does not exist: /non/existent/client.pem",
+		},
+		{
+			name: "non-existent client key file",
+			config: Config{
+				Nomad: NomadConfig{
+					Address: "https://localhost:4646",
+					TLS: &TLSConfig{
+						Enabled:    true,
+						ClientCert: clientCertPath,
+						ClientKey:  "/non/existent/client-key.pem",
+					},
+				},
+				Outputs: map[string]Output{
+					"test": {Type: "stdout"},
+				},
+				Routes: []Route{
+					{Filter: "", Output: "test"},
+				},
+			},
+			expected: "file does not exist: /non/existent/client-key.pem",
+		},
+		{
+			name: "insecure skip verify enabled",
+			config: Config{
+				Nomad: NomadConfig{
+					Address: "https://localhost:4646",
+					TLS: &TLSConfig{
+						Enabled:            true,
+						InsecureSkipVerify: true,
+					},
+				},
+				Outputs: map[string]Output{
+					"test": {Type: "stdout"},
+				},
+				Routes: []Route{
+					{Filter: "", Output: "test"},
+				},
+			},
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.config.validate()
+			if tt.expected == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expected)
+			}
+		})
+	}
+}

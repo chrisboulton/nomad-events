@@ -1,0 +1,18 @@
+nomad:
+  address: "https://nomad.example.com:4646"
+  token: "your-nomad-token"
+  tls:
+    enabled: true
+    ca_cert: "/etc/ssl/certs/nomad-ca.pem"
+    client_cert: "/etc/ssl/certs/nomad-client.pem"
+    client_key: "/etc/ssl/private/nomad-client-key.pem"
+    server_name: "nomad.example.com"
+
+outputs:
+  secure_stdout:
+    type: stdout
+    format: json
+
+routes:
+  - filter: ""
+    output: secure_stdout
