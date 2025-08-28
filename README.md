@@ -5,10 +5,12 @@ A Go service that connects to the Nomad HTTP events streaming API, processes eve
 ## Features
 
 - **Nomad Event Streaming**: Connects to Nomad's event stream API with automatic reconnection and backoff
-- **Configurable Routing**: CEL-based expression filtering to route events to specific outputs
-- **Multiple Output Types**: Support for stdout, Slack, HTTP webhooks, RabbitMQ, and command execution
-- **Fault Tolerance**: Automatic reconnection with exponential backoff when connections are lost
+- **Hierarchical Routing**: CEL-based expression filtering with unlimited depth child routes (AlertManager-style)
+- **Multiple Output Types**: Support for stdout, Slack, HTTP webhooks, RabbitMQ, and command execution  
+- **Hot Configuration Reload**: Reload routing and output configuration via SIGHUP without restart
+- **Fault Tolerance**: Automatic reconnection with exponential backoff and configurable retry logic
 - **Index Tracking**: Resumes from last received event index after reconnection
+- **Structured Logging**: Comprehensive structured logging with configurable levels and formats
 
 ## Configuration
 
@@ -499,7 +501,46 @@ go build -o nomad-events cmd/nomad-events/main.go
 
 # Run with custom config
 ./nomad-events -config /path/to/config.yaml
+
+# Validate configuration before running
+./nomad-events -validate-config -config /path/to/config.yaml
+
+# Run with debug logging
+./nomad-events -log-level debug -log-format json
 ```
+
+### Configuration Reload
+
+The service supports hot configuration reloading via SIGHUP signal:
+
+```bash
+# Start the service
+./nomad-events -config config.yaml &
+PID=$!
+
+# Update config.yaml with new settings
+vim config.yaml
+
+# Reload configuration without restart
+kill -HUP $PID
+```
+
+**Reload Behavior:**
+- ✅ **Zero downtime**: Event processing continues during reload
+- ✅ **Atomic updates**: New configuration is validated before applying
+- ✅ **Graceful fallback**: Service continues with current config if reload fails
+- ✅ **Thread-safe**: Concurrent event processing is fully supported
+- ✅ **Comprehensive logging**: Detailed reload status and error reporting
+
+**What can be reloaded:**
+- Routing rules and filters
+- Output configurations and settings
+- Retry policies
+- Template configurations
+
+**What requires restart:**
+- Nomad connection settings (address, token)
+- Log level and format settings
 
 ## Example Events
 
