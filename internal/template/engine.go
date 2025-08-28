@@ -90,6 +90,10 @@ func (e *Engine) createTemplateData(event nomad.Event) map[string]interface{} {
 		data["Payload"] = event.Payload
 	}
 
+	if event.Diff != nil {
+		data["Diff"] = event.Diff
+	}
+
 	return data
 }
 

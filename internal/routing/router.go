@@ -23,6 +23,7 @@ type rule struct {
 func NewRouter(routes []config.Route) (*Router, error) {
 	env, err := cel.NewEnv(
 		cel.Variable("event", cel.MapType(cel.StringType, cel.DynType)),
+		cel.Variable("diff", cel.MapType(cel.StringType, cel.DynType)),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create CEL environment: %w", err)
@@ -74,11 +75,13 @@ func (r *Router) Route(event nomad.Event) ([]string, error) {
 		"Namespace": event.Namespace,
 		"Index":     event.Index,
 		"Payload":   event.Payload,
+		"Diff":      event.Diff,
 	}
 
 	for _, rule := range r.rules {
 		result, _, err := rule.filter.Eval(map[string]interface{}{
 			"event": eventMap,
+			"diff":  event.Diff,
 		})
 		if err != nil {
 			continue

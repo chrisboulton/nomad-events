@@ -2,6 +2,7 @@ package nomad
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"time"
@@ -16,6 +17,7 @@ type Event struct {
 	Namespace string      `json:"Namespace"`
 	Index     uint64      `json:"Index"`
 	Payload   interface{} `json:"Payload"`
+	Diff      interface{} `json:"Diff,omitempty"`
 }
 
 type EventStream struct {
@@ -120,6 +122,25 @@ func (es *EventStream) connectAndStream(ctx context.Context, eventChan chan<- Ev
 					Payload:   event.Payload,
 				}
 
+				// Fetch job diff for JobRegistered events
+				if string(event.Topic) == "Job" && event.Type == "JobRegistered" {
+					if jobData, ok := event.Payload["Job"].(map[string]interface{}); ok {
+						if jobID, ok := jobData["ID"].(string); ok {
+							// Only fetch diff if job version > 1 (has previous version to compare)
+							if version, ok := jobData["Version"].(float64); ok && version > 1 {
+								diff, err := es.fetchJobDiff(jobID)
+								if err != nil {
+									log.Printf("Failed to fetch job diff for %s: %v", jobID, err)
+									// Continue without diff - don't fail the entire event
+								} else {
+									nomadEvent.Diff = diff
+								}
+							}
+							// For version 1 jobs, nomadEvent.Diff remains nil (no previous version to compare)
+						}
+					}
+				}
+
 				es.lastIndex = event.Index
 
 				select {
@@ -141,4 +162,37 @@ func (es *EventStream) exponentialBackoff() {
 
 func (es *EventStream) Client() *api.Client {
 	return es.client
+}
+
+// fetchJobDiff fetches the diff between the current job version and the previous version
+func (es *EventStream) fetchJobDiff(jobID string) (interface{}, error) {
+	if es.client == nil {
+		return nil, fmt.Errorf("nomad client not available")
+	}
+
+	// Get job versions with diffs enabled
+	_, diffs, _, err := es.client.Jobs().Versions(jobID, true, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get job versions: %w", err)
+	}
+
+	if len(diffs) == 0 {
+		return nil, fmt.Errorf("no job diffs available")
+	}
+
+	// Convert JobDiff struct to map for CEL compatibility
+	// This ensures that CEL expressions like has(event.Diff.Type) work correctly
+	diff := diffs[0]
+	diffBytes, err := json.Marshal(diff)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal job diff: %w", err)
+	}
+	
+	var diffMap map[string]interface{}
+	err = json.Unmarshal(diffBytes, &diffMap)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal job diff: %w", err)
+	}
+
+	return diffMap, nil
 }

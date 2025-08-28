@@ -202,7 +202,7 @@ blocks:
   - condition: "event.Topic == 'Deployment'"
     type: header
     text: "🚀 Deployment: {{ .Payload.DeploymentID }}"
-  
+
   # Section with conditional fields
   - type: section
     text:
@@ -221,7 +221,7 @@ blocks:
       - condition: "has(event.Payload.StartTime)"
         type: plain_text
         text: "{{ .Payload.StartTime }}"
-  
+
   # Actions with conditional elements
   - type: actions
     elements:
@@ -277,7 +277,7 @@ Conditions work seamlessly with range directives:
 Conditions use CEL (Common Expression Language) with access to full event data:
 
 - `event.Topic == 'Node'` - Check event topic
-- `event.Type == 'JobRegistered'` - Check event type  
+- `event.Type == 'JobRegistered'` - Check event type
 - `has(event.Payload.StartTime)` - Check if field exists
 - `event.Payload.Failed > 0` - Numeric comparisons
 - `event.Topic == 'Job' && event.Type == 'JobFailed'` - Complex conditions with AND/OR
@@ -374,6 +374,57 @@ slack_job_details:
 
 Note: These functions make live API calls to Nomad, so use them judiciously to avoid performance impact. Functions return `nil` if the API call fails or if the Nomad client is not available.
 
+### Job Diffs
+
+For `JobRegistered` events with version > 1, the service automatically fetches job version diffs from the Nomad API and makes them available in both filters and templates. New jobs (version 1) do not have diffs since there's no previous version to compare against.
+
+**Filter Usage:**
+```yaml
+routes:
+  # Route jobs with scaling changes
+  - filter: "event.Topic == 'Job' && event.Type == 'JobRegistered' && has(event.Diff)"
+    output: job_changes
+
+  # Route specific task group changes
+  - filter: "event.Topic == 'Job' && event.Type == 'JobRegistered' && event.Diff.TaskGroups.Name == 'web'"
+    output: web_scaling
+```
+
+**Template Usage:**
+```yaml
+stdout_job_scaling:
+  type: stdout
+  format: text
+  text: |
+    🚀 {{ .Topic }}/{{ .Type }}: {{ .Payload.Job.ID }}
+    {{ if .Diff }}
+    Changes:
+    {{ range $tg := .Diff.TaskGroups }}
+      Task Group: {{ $tg.Name }}
+      {{ range $field := $tg.Fields }}
+        {{ $field.Name }}: {{ $field.Old }} → {{ $field.New }}
+      {{ end }}
+    {{ end }}
+    {{ end }}
+```
+
+**Diff Structure:**
+The diff object contains structured information about changes between job versions:
+- `Type`: Type of diff (e.g., "Added", "Edited", "Deleted")
+- `TaskGroups`: Array of task group changes
+  - `Name`: Task group name
+  - `Type`: Change type for this task group
+  - `Fields`: Array of field-level changes
+    - `Name`: Field name (e.g., "Count", "Resources")
+    - `Old`: Previous value
+    - `New`: New value
+- `Objects`: Top-level job specification changes
+
+**Error Handling:**
+- If the job diff API call fails, the event is still processed but `event.Diff` will be `nil`
+- Use `has(event.Diff)` in filters to check for diff availability
+- Templates should check for diff existence: `{{ if .Diff }}...{{ end }}`
+
 ### Routing Rules
 
 Routes use CEL (Common Expression Language) to filter events:
@@ -400,6 +451,7 @@ Event fields available in filters:
 - `event.Namespace`: Nomad namespace
 - `event.Index`: Event index
 - `event.Payload`: Parsed JSON payload
+- `diff`: Direct access to diff data (only available for JobRegistered events with version > 1)
 
 ## Usage
 
