@@ -1,6 +1,6 @@
 module nomad-events
 
-go 1.21
+go 1.25
 
 require (
 	github.com/google/cel-go v0.20.1
