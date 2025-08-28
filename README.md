@@ -288,6 +288,11 @@ Conditions use CEL (Common Expression Language) with access to full event data:
 - Missing CEL environment falls back to including all items
 - Condition evaluation errors are logged but don't break message formatting
 
+**Empty Message Handling:**
+- If all blocks are filtered out by conditions, the Slack message is not sent
+- Text-only messages (without blocks) are always sent regardless of conditions
+- Messages with no content (no blocks and no text) are automatically skipped
+
 #### http
 Sends events via HTTP requests.
 - `url`: Target URL (required)

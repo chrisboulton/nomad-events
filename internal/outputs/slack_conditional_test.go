@@ -12,7 +12,7 @@ import (
 
 func TestSlackOutputWithConditionalBlocks(t *testing.T) {
 	config := map[string]interface{}{
-		"webhook_url": "https://hooks.slack.com/services/test",
+		"webhook_url": "http://invalid-fake-url.local/webhook",
 		"channel":     "#test",
 		"blocks": []interface{}{
 			map[string]interface{}{
@@ -99,7 +99,7 @@ func TestSlackOutputWithConditionalBlocks(t *testing.T) {
 
 func TestSlackOutputWithConditionalFields(t *testing.T) {
 	config := map[string]interface{}{
-		"webhook_url": "https://hooks.slack.com/services/test",
+		"webhook_url": "http://invalid-fake-url.local/webhook",
 		"channel":     "#test",
 		"blocks": []interface{}{
 			map[string]interface{}{
@@ -180,7 +180,7 @@ func TestSlackOutputWithConditionalFields(t *testing.T) {
 
 func TestSlackOutputWithConditionalElements(t *testing.T) {
 	config := map[string]interface{}{
-		"webhook_url": "https://hooks.slack.com/services/test",
+		"webhook_url": "http://invalid-fake-url.local/webhook",
 		"channel":     "#test",
 		"blocks": []interface{}{
 			map[string]interface{}{
@@ -256,7 +256,7 @@ func TestSlackOutputWithConditionalElements(t *testing.T) {
 
 func TestSlackOutputWithConditionalRangeItems(t *testing.T) {
 	config := map[string]interface{}{
-		"webhook_url": "https://hooks.slack.com/services/test",
+		"webhook_url": "http://invalid-fake-url.local/webhook",
 		"channel":     "#test",
 		"blocks": []interface{}{
 			map[string]interface{}{
@@ -380,6 +380,212 @@ func TestSlackTemplateEngineConditionEvaluation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := engine.evaluateCondition(tt.condition, eventData)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestSlackOutputSkipsEmptyMessages(t *testing.T) {
+	tests := []struct {
+		name         string
+		config       map[string]interface{}
+		event        nomad.Event
+		shouldSend   bool
+		description  string
+	}{
+		{
+			name: "skip when all blocks filtered out",
+			config: map[string]interface{}{
+				"webhook_url": "http://invalid-fake-url.local/webhook",
+				"channel":     "#test",
+				"blocks": []interface{}{
+					map[string]interface{}{
+						"condition": "event.Topic == 'NonExistentTopic'",
+						"type":      "header",
+						"text":      "This should not appear",
+					},
+				},
+			},
+			event: nomad.Event{
+				Topic: "Job",
+				Type:  "JobRegistered",
+				Index: 123,
+			},
+			shouldSend:  false,
+			description: "All blocks should be filtered out, message should not be sent",
+		},
+		{
+			name: "send when some blocks pass conditions",
+			config: map[string]interface{}{
+				"webhook_url": "http://invalid-fake-url.local/webhook",
+				"channel":     "#test",
+				"blocks": []interface{}{
+					map[string]interface{}{
+						"condition": "event.Topic == 'NonExistentTopic'",
+						"type":      "header",
+						"text":      "This should not appear",
+					},
+					map[string]interface{}{
+						"condition": "event.Topic == 'Job'",
+						"type":      "section",
+						"text": map[string]interface{}{
+							"type": "mrkdwn",
+							"text": "This should appear",
+						},
+					},
+				},
+			},
+			event: nomad.Event{
+				Topic: "Job",
+				Type:  "JobRegistered",
+				Index: 123,
+			},
+			shouldSend:  true,
+			description: "Some blocks should pass, message should be sent",
+		},
+		{
+			name: "send text-only message even without blocks",
+			config: map[string]interface{}{
+				"webhook_url": "http://invalid-fake-url.local/webhook",
+				"channel":     "#test",
+				"text":        "Job event: {{ .Type }}",
+			},
+			event: nomad.Event{
+				Topic: "Job",
+				Type:  "JobRegistered",
+				Index: 123,
+			},
+			shouldSend:  true,
+			description: "Text-only messages should always be sent",
+		},
+		{
+			name: "send when blocks exist and no conditions",
+			config: map[string]interface{}{
+				"webhook_url": "http://invalid-fake-url.local/webhook",
+				"channel":     "#test",
+				"blocks": []interface{}{
+					map[string]interface{}{
+						"type": "header",
+						"text": "Unconditional header",
+					},
+				},
+			},
+			event: nomad.Event{
+				Topic: "Job",
+				Type:  "JobRegistered",
+				Index: 123,
+			},
+			shouldSend:  true,
+			description: "Unconditional blocks should always be sent",
+		},
+		{
+			name: "skip when no blocks and no text",
+			config: map[string]interface{}{
+				"webhook_url": "http://invalid-fake-url.local/webhook",
+				"channel":     "#test",
+			},
+			event: nomad.Event{
+				Topic: "Job",
+				Type:  "JobRegistered",
+				Index: 123,
+			},
+			shouldSend:  false,
+			description: "Messages with no content should be skipped",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			output, err := NewSlackOutput(tt.config, nil)
+			require.NoError(t, err)
+
+			// Try to send the message
+			err = output.Send(tt.event)
+			
+			if tt.shouldSend {
+				// We expect this to fail because we're using a fake webhook URL,
+				// but it should fail at the HTTP request stage, not before
+				assert.Error(t, err, tt.description)
+				assert.Contains(t, err.Error(), "failed to send Slack message", tt.description)
+			} else {
+				// We expect this to return nil (no error) because the message was skipped
+				assert.NoError(t, err, tt.description)
+			}
+		})
+	}
+}
+
+func TestShouldSkipMessageFunction(t *testing.T) {
+	tests := []struct {
+		name         string
+		message      SlackMessage
+		blockConfigs []BlockConfig
+		textTemplate string
+		expected     bool
+	}{
+		{
+			name: "skip when blocks configured but none returned",
+			message: SlackMessage{
+				Text:   "",
+				Blocks: []slack.Block{}, // Empty blocks slice
+			},
+			blockConfigs: []BlockConfig{
+				{Type: "header"},
+			},
+			textTemplate: "",
+			expected:     true,
+		},
+		{
+			name: "don't skip when blocks returned",
+			message: SlackMessage{
+				Text: "",
+				Blocks: []slack.Block{
+					&slack.HeaderBlock{}, // At least one block
+				},
+			},
+			blockConfigs: []BlockConfig{
+				{Type: "header"},
+			},
+			textTemplate: "",
+			expected:     false,
+		},
+		{
+			name: "don't skip when no block configs but has text",
+			message: SlackMessage{
+				Text:   "Some text message",
+				Blocks: nil,
+			},
+			blockConfigs: []BlockConfig{},
+			textTemplate: "{{ .Type }}",
+			expected:     false,
+		},
+		{
+			name: "skip when no blocks and no text",
+			message: SlackMessage{
+				Text:   "",
+				Blocks: nil,
+			},
+			blockConfigs: []BlockConfig{},
+			textTemplate: "",
+			expected:     true,
+		},
+		{
+			name: "don't skip when blocks interface is not slice",
+			message: SlackMessage{
+				Text:   "",
+				Blocks: "invalid", // Not a slice
+			},
+			blockConfigs: []BlockConfig{
+				{Type: "header"},
+			},
+			textTemplate: "",
+			expected:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := shouldSkipMessage(tt.message, tt.blockConfigs, tt.textTemplate)
 			assert.Equal(t, tt.expected, result)
 		})
 	}

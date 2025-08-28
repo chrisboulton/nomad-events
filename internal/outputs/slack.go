@@ -10,6 +10,7 @@ import (
 	"nomad-events/internal/nomad"
 
 	"github.com/hashicorp/nomad/api"
+	"github.com/slack-go/slack"
 )
 
 type SlackOutput struct {
@@ -118,6 +119,11 @@ func (o *SlackOutput) Send(event nomad.Event) error {
 		return fmt.Errorf("failed to format event: %w", err)
 	}
 
+	// Check if we should skip sending the message
+	if shouldSkipMessage(message, o.blockConfigs, o.textTemplate) {
+		return nil // Skip sending empty message
+	}
+
 	payload, err := json.Marshal(message)
 	if err != nil {
 		return fmt.Errorf("failed to marshal Slack message: %w", err)
@@ -137,15 +143,20 @@ func (o *SlackOutput) Send(event nomad.Event) error {
 }
 
 func (o *SlackOutput) formatEvent(event nomad.Event) (SlackMessage, error) {
+	var blocks []slack.Block
+	var text string
+	var err error
 
-	blocks, err := o.templateEngine.ProcessBlocks(o.blockConfigs, event)
-	if err != nil {
-		return SlackMessage{}, fmt.Errorf("failed to process blocks: %w", err)
-	}
+	if o.templateEngine != nil {
+		blocks, err = o.templateEngine.ProcessBlocks(o.blockConfigs, event)
+		if err != nil {
+			return SlackMessage{}, fmt.Errorf("failed to process blocks: %w", err)
+		}
 
-	text, err := o.templateEngine.ProcessText(o.textTemplate, event)
-	if err != nil {
-		return SlackMessage{}, fmt.Errorf("failed to process text: %w", err)
+		text, err = o.templateEngine.ProcessText(o.textTemplate, event)
+		if err != nil {
+			return SlackMessage{}, fmt.Errorf("failed to process text: %w", err)
+		}
 	}
 
 	message := SlackMessage{
@@ -155,4 +166,24 @@ func (o *SlackOutput) formatEvent(event nomad.Event) (SlackMessage, error) {
 	}
 
 	return message, nil
+}
+
+// shouldSkipMessage determines if a Slack message should be skipped
+func shouldSkipMessage(message SlackMessage, blockConfigs []BlockConfig, textTemplate string) bool {
+	// If we have block configurations but no blocks were generated, skip the message
+	if len(blockConfigs) > 0 {
+		if blocks, ok := message.Blocks.([]slack.Block); ok {
+			if len(blocks) == 0 {
+				// All blocks were filtered out by conditions
+				return true
+			}
+		}
+	}
+
+	// If we have no blocks and no text, skip the message
+	if len(blockConfigs) == 0 && textTemplate == "" && message.Text == "" {
+		return true
+	}
+
+	return false
 }
