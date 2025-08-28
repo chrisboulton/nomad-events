@@ -1,0 +1,42 @@
+nomad:
+  address: "http://localhost:4646"
+  token: ""
+
+outputs:
+  debug_log:
+    type: stdout
+    format: json
+  node_events:
+    type: stdout
+    format: text
+    text: "Node: {{ .Payload.Node.Name }} ({{ .Type }})"
+  node_registrations:
+    type: stdout
+    format: text
+    text: "✅ Node {{ .Payload.Node.Name }} registered"
+  job_events:
+    type: stdout
+    format: text
+    text: "Job: {{ .Payload.Job.ID }} ({{ .Type }})"
+
+routes:
+  # Parent route for all Node events
+  - filter: event.Topic == 'Node'
+    output: node_events      # All node events go here
+    routes:
+      # Child route for just registrations
+      - filter: event.Type == 'NodeRegistration'
+        output: node_registrations   # Registration events ALSO go here
+        
+  # Parent route for Job events (no output, just filters)
+  - filter: event.Topic == 'Job'  
+    routes:
+      # Child routes handle the actual outputs
+      - filter: event.Type == 'JobRegistered'
+        output: job_events
+      - filter: event.Type == 'JobDeregistered' 
+        output: job_events
+        
+  # Catch-all route for debugging (processes last)
+  - filter: ""
+    output: debug_log

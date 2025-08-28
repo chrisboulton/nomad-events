@@ -457,17 +457,23 @@ Routes use CEL (Common Expression Language) to filter events:
 
 ```yaml
 routes:
-  # All events
-  - filter: ""
-    output: stdout_output
+  # Parent route processes all Node events
+  - filter: event.Topic == 'Node'
+    output: node_events
+    routes:
+      # Child routes for specific node event types
+      - filter: event.Type == 'NodeRegistration'
+        output: node_registrations
+      - filter: event.Type == 'NodeDrain'
+        output: node_drains
+        continue: false  # Stop processing other child routes
 
-  # Node registration events only
-  - filter: event.Topic == 'Node' && event.Type == 'NodeRegistration'
-    output: slack_alerts
-
-  # Events for specific node
-  - filter: event.Topic == 'Node' && event.Payload.Node.Name == 'worker-1'
-    output: node_specific_output
+  # Job events with continue=false stops other top-level routes
+  - filter: event.Topic == 'Job'
+    continue: false
+    routes:
+      - filter: event.Type == 'JobRegistered'
+        output: job_events
 ```
 
 Event fields available in filters:

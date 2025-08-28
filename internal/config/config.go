@@ -24,9 +24,10 @@ type Output struct {
 }
 
 type Route struct {
-	Filter         string `yaml:"filter"`
-	Output         string `yaml:"output"`
-	StopProcessing bool   `yaml:"stop_processing"`
+	Filter   string  `yaml:"filter"`
+	Output   string  `yaml:"output,omitempty"`    // Optional - parent routes can just filter
+	Continue *bool   `yaml:"continue,omitempty"`  // Optional - defaults to true
+	Routes   []Route `yaml:"routes,omitempty"`    // Child routes
 }
 
 func LoadConfig(path string) (*Config, error) {
@@ -59,11 +60,33 @@ func (c *Config) validate() error {
 	}
 
 	for i, route := range c.Routes {
-		if route.Output == "" {
-			return fmt.Errorf("route %d: output is required", i)
+		if err := c.validateRoute(route, fmt.Sprintf("route %d", i)); err != nil {
+			return err
 		}
+	}
+
+	return nil
+}
+
+// validateRoute recursively validates a route and its children
+func (c *Config) validateRoute(route Route, path string) error {
+	// Route must have either an output or child routes (or both)
+	if route.Output == "" && len(route.Routes) == 0 {
+		return fmt.Errorf("%s: route must have either an output or child routes", path)
+	}
+
+	// If output is specified, it must exist
+	if route.Output != "" {
 		if _, exists := c.Outputs[route.Output]; !exists {
-			return fmt.Errorf("route %d: output %q does not exist", i, route.Output)
+			return fmt.Errorf("%s: output %q does not exist", path, route.Output)
+		}
+	}
+
+	// Recursively validate child routes
+	for i, childRoute := range route.Routes {
+		childPath := fmt.Sprintf("%s.routes[%d]", path, i)
+		if err := c.validateRoute(childRoute, childPath); err != nil {
+			return err
 		}
 	}
 

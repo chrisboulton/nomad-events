@@ -1,0 +1,75 @@
+nomad:
+  address: "http://localhost:4646"
+  token: ""
+
+outputs:
+  all_events_log:
+    type: stdout
+    format: json
+  node_notifications:
+    type: stdout  
+    format: text
+    text: "🖥️  Node {{ .Payload.Node.Name }} ({{ .Type }})"
+  node_registration_alert:
+    type: stdout
+    format: text
+    text: "✅ New node registered: {{ .Payload.Node.Name }}"
+  node_failure_alert:
+    type: stdout
+    format: text
+    text: "🚨 Node failed: {{ .Payload.Node.Name }}"
+  job_notifications:
+    type: stdout
+    format: text  
+    text: "🚀 Job {{ .Payload.Job.ID }}: {{ .Type }}"
+  job_scale_alert:
+    type: stdout
+    format: text
+    text: |
+      📊 Job {{ .Payload.Job.ID }} was scaled:
+      {{- range $tg := .Diff.TaskGroups -}}
+        {{- range $v := $tg.Fields }}
+          {{ if eq $v.Name "Count" }} {{ $tg.Name }} {{ $v.Old }} -> {{ $v.New }} {{ end }}
+        {{- end }}
+      {{- end }}
+  critical_alert:
+    type: stdout
+    format: text
+    text: "🔥 CRITICAL: {{ .Type }} event requires attention"
+
+routes:
+  # First, log all events for debugging
+  - filter: ""
+    output: all_events_log
+    
+  # Node event processing (continue by default)  
+  - filter: event.Topic == 'Node'
+    output: node_notifications  # Output at parent level
+    routes:
+      - filter: event.Type == 'NodeRegistration'
+        output: node_registration_alert
+      - filter: event.Type == 'NodeDrain' || event.Type == 'NodeDown'
+        output: node_failure_alert
+        continue: false  # Stop processing other node child routes for failures
+      - filter: event.Payload.Node.Status == 'down'
+        output: critical_alert  # This won't run if NodeDrain/NodeDown matched above
+        
+  # Job event processing with continue=false to stop processing other top-level routes
+  - filter: event.Topic == 'Job'
+    continue: false  # Stop processing siblings if any job event matches
+    routes:
+      - filter: event.Type == 'JobRegistered' || event.Type == 'JobDeregistered'  
+        output: job_notifications
+      - filter: |
+          event.Type == 'JobRegistered' &&
+          diff.TaskGroups.exists(tg,
+            tg.Fields.exists(f,
+              f.Name == "Count" &&
+              int(f.New) != int(f.Old)
+            )
+          )
+        output: job_scale_alert
+        
+  # This route will only process non-Job events due to continue=false above
+  - filter: event.Topic == 'Allocation' && event.Type == 'AllocationFailed'
+    output: critical_alert

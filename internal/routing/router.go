@@ -11,13 +11,14 @@ import (
 )
 
 type Router struct {
-	rules []rule
+	routes []routeNode
 }
 
-type rule struct {
-	filter         cel.Program
-	outputs        []string
-	stopProcessing bool
+type routeNode struct {
+	filter        cel.Program
+	output        string         // empty if no output
+	shouldContinue bool           // true by default
+	children      []routeNode    // child routes
 }
 
 func NewRouter(routes []config.Route) (*Router, error) {
@@ -29,11 +30,23 @@ func NewRouter(routes []config.Route) (*Router, error) {
 		return nil, fmt.Errorf("failed to create CEL environment: %w", err)
 	}
 
-	rules := make([]rule, 0, len(routes))
+	routeNodes, err := buildRouteNodes(routes, env)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Router{routes: routeNodes}, nil
+}
+
+// buildRouteNodes recursively builds route nodes from config routes
+func buildRouteNodes(routes []config.Route, env *cel.Env) ([]routeNode, error) {
+	nodes := make([]routeNode, len(routes))
 
 	for i, route := range routes {
 		var program cel.Program
+		var err error
 
+		// Compile filter
 		if route.Filter == "" {
 			ast, issues := env.Compile("true")
 			if issues.Err() != nil {
@@ -55,19 +68,30 @@ func NewRouter(routes []config.Route) (*Router, error) {
 			}
 		}
 
-		rules = append(rules, rule{
-			filter:         program,
-			outputs:        []string{route.Output},
-			stopProcessing: route.StopProcessing,
-		})
+		// Set continue flag (defaults to true)
+		continueFlag := true
+		if route.Continue != nil {
+			continueFlag = *route.Continue
+		}
+
+		// Build child routes
+		children, err := buildRouteNodes(route.Routes, env)
+		if err != nil {
+			return nil, fmt.Errorf("failed to build child routes for route %d: %w", i, err)
+		}
+
+		nodes[i] = routeNode{
+			filter:        program,
+			output:        route.Output,
+			shouldContinue: continueFlag,
+			children:      children,
+		}
 	}
 
-	return &Router{rules: rules}, nil
+	return nodes, nil
 }
 
 func (r *Router) Route(event nomad.Event) ([]string, error) {
-	var matchedOutputs []string
-
 	eventMap := map[string]interface{}{
 		"Topic":     event.Topic,
 		"Type":      event.Type,
@@ -78,18 +102,44 @@ func (r *Router) Route(event nomad.Event) ([]string, error) {
 		"Diff":      event.Diff,
 	}
 
-	for _, rule := range r.rules {
-		result, _, err := rule.filter.Eval(map[string]interface{}{
-			"event": eventMap,
-			"diff":  event.Diff,
-		})
+	evalContext := map[string]interface{}{
+		"event": eventMap,
+		"diff":  event.Diff,
+	}
+
+	return r.processRoutes(r.routes, evalContext)
+}
+
+// processRoutes recursively processes routes and returns matched outputs
+func (r *Router) processRoutes(routes []routeNode, evalContext map[string]interface{}) ([]string, error) {
+	var matchedOutputs []string
+
+	for _, route := range routes {
+		// Evaluate filter
+		result, _, err := route.filter.Eval(evalContext)
 		if err != nil {
+			// Continue to next route if filter evaluation fails
 			continue
 		}
 
 		if result == types.True {
-			matchedOutputs = append(matchedOutputs, rule.outputs...)
-			if rule.stopProcessing {
+			// Route matched - add output if specified
+			if route.output != "" {
+				matchedOutputs = append(matchedOutputs, route.output)
+			}
+
+			// Process child routes
+			if len(route.children) > 0 {
+				childOutputs, err := r.processRoutes(route.children, evalContext)
+				if err != nil {
+					// Don't fail entire routing if child route fails
+					continue
+				}
+				matchedOutputs = append(matchedOutputs, childOutputs...)
+			}
+
+			// If continue is false, stop processing siblings
+			if !route.shouldContinue {
 				break
 			}
 		}

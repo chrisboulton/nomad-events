@@ -91,7 +91,7 @@ routes:
 			errorMsg:    "output \"non_existent\" does not exist",
 		},
 		{
-			name: "route without output",
+			name: "route without output or child routes",
 			configYAML: `
 nomad:
   address: "http://localhost:4646"
@@ -104,7 +104,7 @@ routes:
   - filter: ""
 `,
 			expectError: true,
-			errorMsg:    "output is required",
+			errorMsg:    "route must have either an output or child routes",
 		},
 	}
 

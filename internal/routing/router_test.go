@@ -52,7 +52,7 @@ func TestNewRouter(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 				assert.NotNil(t, router)
-				assert.Len(t, router.rules, len(tt.routes))
+				assert.Len(t, router.routes, len(tt.routes))
 			}
 		})
 	}
@@ -168,6 +168,107 @@ func TestRouterRouteNonExistentField(t *testing.T) {
 	outputs, err := router.Route(event)
 	assert.NoError(t, err)
 	assert.Equal(t, []string{"all_events"}, outputs)
+}
+
+func TestHierarchicalRouting(t *testing.T) {
+	continueFalse := false
+
+	routes := []config.Route{
+		{
+			Filter: "event.Topic == 'Node'",
+			Output: "node_events",
+			Routes: []config.Route{
+				{Filter: "event.Type == 'NodeRegistration'", Output: "node_registrations"},
+				{Filter: "event.Type == 'NodeUpdate'", Output: "node_updates"},
+			},
+		},
+		{
+			Filter:   "event.Topic == 'Job'",
+			Continue: &continueFalse, // Stop processing siblings if this matches
+			Routes: []config.Route{
+				{Filter: "event.Type == 'JobRegistered'", Output: "job_registered"},
+				{Filter: "event.Type == 'JobDeregistered'", Output: "job_deregistered"},
+			},
+		},
+		{
+			Filter: "", // This should not be processed if Job route matches due to continue=false
+			Output: "catch_all",
+		},
+	}
+
+	router, err := NewRouter(routes)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name            string
+		event           nomad.Event
+		expectedOutputs []string
+	}{
+		{
+			name: "node registration - hierarchical processing",
+			event: nomad.Event{
+				Topic: "Node",
+				Type:  "NodeRegistration",
+				Index: 1,
+			},
+			expectedOutputs: []string{"node_events", "node_registrations", "catch_all"},
+		},
+		{
+			name: "job registered - continue=false stops siblings",
+			event: nomad.Event{
+				Topic: "Job",
+				Type:  "JobRegistered",
+				Index: 2,
+			},
+			expectedOutputs: []string{"job_registered"}, // catch_all should not be included due to continue=false
+		},
+		{
+			name: "allocation event - only catch_all matches",
+			event: nomad.Event{
+				Topic: "Allocation",
+				Type:  "AllocationCreated",
+				Index: 3,
+			},
+			expectedOutputs: []string{"catch_all"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			outputs, err := router.Route(tt.event)
+			assert.NoError(t, err)
+			assert.ElementsMatch(t, tt.expectedOutputs, outputs)
+		})
+	}
+}
+
+func TestHierarchicalRoutingParentWithoutOutput(t *testing.T) {
+	routes := []config.Route{
+		{
+			Filter: "event.Topic == 'Job'", // Parent route with no output, just filters
+			Routes: []config.Route{
+				{Filter: "event.Type == 'JobRegistered'", Output: "job_registered"},
+				{Filter: "event.Type == 'JobDeregistered'", Output: "job_deregistered"},
+			},
+		},
+		{
+			Filter: "",
+			Output: "all_events",
+		},
+	}
+
+	router, err := NewRouter(routes)
+	require.NoError(t, err)
+
+	event := nomad.Event{
+		Topic: "Job",
+		Type:  "JobRegistered",
+		Index: 1,
+	}
+
+	outputs, err := router.Route(event)
+	assert.NoError(t, err)
+	assert.ElementsMatch(t, []string{"job_registered", "all_events"}, outputs)
 }
 
 
