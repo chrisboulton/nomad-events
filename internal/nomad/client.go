@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/hashicorp/nomad/api"
@@ -55,7 +55,7 @@ func (es *EventStream) Stream(ctx context.Context, eventChan chan<- Event) error
 		}
 
 		if err := es.streamWithRetry(ctx, eventChan); err != nil {
-			log.Printf("Stream ended with error: %v", err)
+			slog.Error("Stream ended with error", "error", err)
 
 			select {
 			case <-ctx.Done():
@@ -81,7 +81,7 @@ func (es *EventStream) streamWithRetry(ctx context.Context, eventChan chan<- Eve
 			return fmt.Errorf("max retries exceeded: %w", err)
 		}
 
-		log.Printf("Connection failed (attempt %d/%d): %v", retries, es.maxRetries, err)
+		slog.Warn("Connection failed", "attempt", retries, "max_retries", es.maxRetries, "error", err)
 
 		select {
 		case <-ctx.Done():
@@ -130,7 +130,7 @@ func (es *EventStream) connectAndStream(ctx context.Context, eventChan chan<- Ev
 							if version, ok := jobData["Version"].(float64); ok && version > 1 {
 								diff, err := es.fetchJobDiff(jobID)
 								if err != nil {
-									log.Printf("Failed to fetch job diff for %s: %v", jobID, err)
+									slog.Warn("Failed to fetch job diff", "job_id", jobID, "error", err)
 									// Continue without diff - don't fail the entire event
 								} else {
 									nomadEvent.Diff = diff

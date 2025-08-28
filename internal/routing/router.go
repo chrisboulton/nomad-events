@@ -59,12 +59,12 @@ func buildRouteNodes(routes []config.Route, env *cel.Env) ([]routeNode, error) {
 		} else {
 			ast, issues := env.Compile(route.Filter)
 			if issues.Err() != nil {
-				return nil, fmt.Errorf("failed to compile filter for route %d: %w", i, issues.Err())
+				return nil, fmt.Errorf("failed to compile filter for route %d: %w\nfilter: %q", i, issues.Err(), route.Filter)
 			}
 
 			program, err = env.Program(ast)
 			if err != nil {
-				return nil, fmt.Errorf("failed to create program for route %d: %w", i, err)
+				return nil, fmt.Errorf("failed to create program for route %d: %w\nfilter: %q", i, err, route.Filter)
 			}
 		}
 

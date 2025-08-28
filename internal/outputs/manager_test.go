@@ -188,7 +188,7 @@ func TestCreateOutput(t *testing.T) {
 				Type: "unsupported",
 			},
 			expectError: true,
-			errorMsg:    "unsupported output type: unsupported",
+			errorMsg:    "unsupported output type: \"unsupported\"",
 		},
 	}
 

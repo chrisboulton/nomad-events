@@ -8,7 +8,9 @@
       "Bash(go test:*)",
       "WebFetch(domain:pkg.go.dev)",
       "Bash(go get:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(go vet:*)",
+      "Bash(gofmt:*)"
     ],
     "deny": [],
     "ask": []

@@ -1,0 +1,31 @@
+nomad:
+  address: "http://localhost:4646"
+  token: ""
+
+outputs:
+  stdout_reliable:
+    type: stdout
+    format: json
+    retry:
+      max_retries: 3
+      base_delay: "1s"
+      
+  slack_with_retry:
+    type: slack
+    webhook_url: "https://hooks.slack.com/services/invalid/webhook/url"
+    channel: "#alerts" 
+    text: "🚨 {{ .Topic }}/{{ .Type }} event"
+    retry:
+      max_retries: 5
+      base_delay: "2s"
+      
+  http_no_retry:
+    type: http
+    url: "https://example.com/webhook"
+    # No retry config - will use default behavior
+
+routes:
+  - filter: event.Topic == 'Node'
+    output: slack_with_retry
+  - filter: ""
+    output: stdout_reliable
