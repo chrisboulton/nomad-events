@@ -25,9 +25,9 @@ type Output struct {
 
 type Route struct {
 	Filter   string  `yaml:"filter"`
-	Output   string  `yaml:"output,omitempty"`    // Optional - parent routes can just filter
-	Continue *bool   `yaml:"continue,omitempty"`  // Optional - defaults to true
-	Routes   []Route `yaml:"routes,omitempty"`    // Child routes
+	Output   string  `yaml:"output,omitempty"`   // Optional - parent routes can just filter
+	Continue *bool   `yaml:"continue,omitempty"` // Optional - defaults to true
+	Routes   []Route `yaml:"routes,omitempty"`   // Child routes
 }
 
 func LoadConfig(path string) (*Config, error) {

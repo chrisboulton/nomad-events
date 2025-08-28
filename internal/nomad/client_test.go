@@ -94,7 +94,7 @@ func TestEventStructure(t *testing.T) {
 
 	payload, ok := event.Payload.(map[string]interface{})
 	assert.True(t, ok)
-	
+
 	node, ok := payload["Node"].(map[string]interface{})
 	assert.True(t, ok)
 	assert.Equal(t, "worker-1", node["Name"])
@@ -181,7 +181,7 @@ func TestEventWithDiffSerialization(t *testing.T) {
 func TestEventStreamFetchJobDiff(t *testing.T) {
 	// Note: This test checks the error handling of fetchJobDiff
 	// since we can't mock the Nomad API easily without significant refactoring
-	
+
 	stream, err := NewEventStream("http://localhost:4646", "")
 	require.NoError(t, err)
 
@@ -205,7 +205,7 @@ func TestEventStreamFetchJobDiff(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			diff, err := stream.fetchJobDiff(tt.jobID)
-			
+
 			if tt.expectErr {
 				assert.Error(t, err)
 				assert.Nil(t, diff)
@@ -244,7 +244,7 @@ func TestJobVersionHandling(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// This test verifies that we only attempt diff fetching for jobs with version > 1
 			// The actual logic is tested implicitly through the version check in the code
-			
+
 			jobPayload := map[string]interface{}{
 				"Job": map[string]interface{}{
 					"ID":      "test-job",

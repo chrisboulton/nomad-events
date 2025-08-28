@@ -387,11 +387,11 @@ func TestSlackTemplateEngineConditionEvaluation(t *testing.T) {
 
 func TestSlackOutputSkipsEmptyMessages(t *testing.T) {
 	tests := []struct {
-		name         string
-		config       map[string]interface{}
-		event        nomad.Event
-		shouldSend   bool
-		description  string
+		name        string
+		config      map[string]interface{}
+		event       nomad.Event
+		shouldSend  bool
+		description string
 	}{
 		{
 			name: "skip when all blocks filtered out",
@@ -501,7 +501,7 @@ func TestSlackOutputSkipsEmptyMessages(t *testing.T) {
 
 			// Try to send the message
 			err = output.Send(tt.event)
-			
+
 			if tt.shouldSend {
 				// We expect this to fail because we're using a fake webhook URL,
 				// but it should fail at the HTTP request stage, not before

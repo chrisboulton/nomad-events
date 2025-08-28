@@ -68,18 +68,18 @@ func TestSlackTemplateEngineMixedStaticDynamicFields(t *testing.T) {
 	sectionBlock, ok := block.(*slack.SectionBlock)
 	require.True(t, ok)
 	assert.Equal(t, "Service Status Report", sectionBlock.Text.Text)
-	
+
 	// Should have 6 fields: 2 static + 2x2 from range (2 services)
 	assert.Len(t, sectionBlock.Fields, 6)
-	
+
 	// Check static fields
 	assert.Equal(t, "*Total Services:*", sectionBlock.Fields[0].Text)
 	assert.Equal(t, "3", sectionBlock.Fields[1].Text)
-	
+
 	// Check dynamic fields from first range (service names)
 	assert.Equal(t, "*web:*", sectionBlock.Fields[2].Text)
 	assert.Equal(t, "*api:*", sectionBlock.Fields[3].Text)
-	
+
 	// Check dynamic fields from second range (service status)
 	assert.Equal(t, "running (v1.2.3)", sectionBlock.Fields[4].Text)
 	assert.Equal(t, "starting (v2.1.0)", sectionBlock.Fields[5].Text)
@@ -138,23 +138,23 @@ func TestSlackTemplateEngineMixedStaticDynamicActionElements(t *testing.T) {
 
 	actionBlock, ok := block.(*slack.ActionBlock)
 	require.True(t, ok)
-	
+
 	// Should have 3 elements: 1 static + 2 from range
 	assert.Len(t, actionBlock.Elements.ElementSet, 3)
-	
+
 	// Check static button
 	staticButton, ok := actionBlock.Elements.ElementSet[0].(*slack.ButtonBlockElement)
 	require.True(t, ok)
 	assert.Equal(t, "View All", staticButton.Text.Text)
 	assert.Equal(t, "https://example.com/ui/deployments", staticButton.URL)
-	
+
 	// Check dynamic buttons
 	promoteButton, ok := actionBlock.Elements.ElementSet[1].(*slack.ButtonBlockElement)
 	require.True(t, ok)
 	assert.Equal(t, "Promote", promoteButton.Text.Text)
 	assert.Equal(t, "https://example.com/promote", promoteButton.URL)
 	assert.Equal(t, "quick_promote", promoteButton.ActionID)
-	
+
 	cancelButton, ok := actionBlock.Elements.ElementSet[2].(*slack.ButtonBlockElement)
 	require.True(t, ok)
 	assert.Equal(t, "Cancel", cancelButton.Text.Text)
@@ -174,7 +174,7 @@ func TestSlackTemplateEngineMixedStaticDynamicSelectOptions(t *testing.T) {
 					"Status": "running",
 				},
 				map[string]interface{}{
-					"Name":   "api", 
+					"Name":   "api",
 					"ID":     "service-api",
 					"Status": "stopped",
 				},
@@ -223,21 +223,21 @@ func TestSlackTemplateEngineMixedStaticDynamicSelectOptions(t *testing.T) {
 
 	selectElement, ok := element.(*slack.SelectBlockElement)
 	require.True(t, ok)
-	
+
 	// Should have 4 options: 1 static + 2 from range + 1 static
 	assert.Len(t, selectElement.Options, 4)
-	
+
 	// Check static option
 	assert.Equal(t, "All Services", selectElement.Options[0].Text.Text)
 	assert.Equal(t, "all", selectElement.Options[0].Value)
-	
+
 	// Check dynamic options
 	assert.Equal(t, "web (running)", selectElement.Options[1].Text.Text)
 	assert.Equal(t, "service-web", selectElement.Options[1].Value)
-	
+
 	assert.Equal(t, "api (stopped)", selectElement.Options[2].Text.Text)
 	assert.Equal(t, "service-api", selectElement.Options[2].Value)
-	
+
 	// Check final static option
 	assert.Equal(t, "Other", selectElement.Options[3].Text.Text)
 	assert.Equal(t, "other", selectElement.Options[3].Value)
@@ -284,20 +284,20 @@ func TestSlackTemplateEngineMixedStaticDynamicContextElements(t *testing.T) {
 
 	contextBlock, ok := block.(*slack.ContextBlock)
 	require.True(t, ok)
-	
+
 	// Should have 3 elements: 1 static + 2 from range
 	assert.Len(t, contextBlock.ContextElements.Elements, 3)
-	
+
 	// Check static element
 	staticElement, ok := contextBlock.ContextElements.Elements[0].(*slack.TextBlockObject)
 	require.True(t, ok)
 	assert.Equal(t, "*Node:* worker-1", staticElement.Text)
-	
+
 	// Check dynamic elements
 	attr1Element, ok := contextBlock.ContextElements.Elements[1].(*slack.TextBlockObject)
 	require.True(t, ok)
 	assert.Equal(t, "cpu.arch: amd64", attr1Element.Text)
-	
+
 	attr2Element, ok := contextBlock.ContextElements.Elements[2].(*slack.TextBlockObject)
 	require.True(t, ok)
 	assert.Equal(t, "memory.total: 16GB", attr2Element.Text)
@@ -305,7 +305,7 @@ func TestSlackTemplateEngineMixedStaticDynamicContextElements(t *testing.T) {
 
 func TestSlackTemplateEngineComplexMixedBlocks(t *testing.T) {
 	engine := NewSlackTemplateEngine(nil)
-	
+
 	event := nomad.Event{
 		Topic: "Deployment",
 		Type:  "DeploymentStatusUpdate",
@@ -322,7 +322,7 @@ func TestSlackTemplateEngineComplexMixedBlocks(t *testing.T) {
 				},
 				map[string]interface{}{
 					"Name":    "api",
-					"Version": "v2.1.0", 
+					"Version": "v2.1.0",
 					"Status":  "running",
 					"ID":      "service-api",
 				},
@@ -474,7 +474,7 @@ func TestSlackTemplateEngineRangeErrorHandling(t *testing.T) {
 		Fields: []interface{}{
 			map[string]interface{}{
 				"range": ".Payload.NonExistentServices",
-				"type":  "mrkdwn", 
+				"type":  "mrkdwn",
 				"text":  "{{ .Name }}",
 			},
 			// Should still process static field
@@ -490,7 +490,7 @@ func TestSlackTemplateEngineRangeErrorHandling(t *testing.T) {
 
 	sectionBlock, ok := block.(*slack.SectionBlock)
 	require.True(t, ok)
-	
+
 	// Should only have the static field since range failed
 	assert.Len(t, sectionBlock.Fields, 1)
 	assert.Equal(t, "Static field", sectionBlock.Fields[0].Text)

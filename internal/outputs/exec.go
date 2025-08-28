@@ -82,11 +82,11 @@ func (o *ExecOutput) Send(event nomad.Event) error {
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, o.command[0], o.command[1:]...)
-	
+
 	if o.workdir != "" {
 		cmd.Dir = o.workdir
 	}
-	
+
 	if len(o.env) > 0 {
 		cmd.Env = append(cmd.Env, o.env...)
 	}

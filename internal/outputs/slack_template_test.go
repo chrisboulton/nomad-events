@@ -413,4 +413,3 @@ func TestSlackTemplateEngineGetNestedValue(t *testing.T) {
 		})
 	}
 }
-

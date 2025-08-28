@@ -187,7 +187,7 @@ func (es *EventStream) fetchJobDiff(jobID string) (interface{}, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal job diff: %w", err)
 	}
-	
+
 	var diffMap map[string]interface{}
 	err = json.Unmarshal(diffBytes, &diffMap)
 	if err != nil {

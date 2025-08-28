@@ -31,17 +31,17 @@ func NewRabbitMQOutput(config map[string]interface{}) (*RabbitMQOutput, error) {
 	exchange, _ := config["exchange"].(string)
 	routingKeyTemplate, _ := config["routing_key"].(string)
 	queue, _ := config["queue"].(string)
-	
+
 	// Set default routing key template
 	if routingKeyTemplate == "" {
 		routingKeyTemplate = "nomad.{{ .Topic }}.{{ .Type }}"
 	}
-	
+
 	durable := true
 	if d, ok := config["durable"].(bool); ok {
 		durable = d
 	}
-	
+
 	autoDelete := false
 	if a, ok := config["auto_delete"].(bool); ok {
 		autoDelete = a
@@ -60,13 +60,13 @@ func NewRabbitMQOutput(config map[string]interface{}) (*RabbitMQOutput, error) {
 
 	output := &RabbitMQOutput{
 		connection:         conn,
-		channel:           ch,
-		exchange:          exchange,
+		channel:            ch,
+		exchange:           exchange,
 		routingKeyTemplate: routingKeyTemplate,
-		queue:             queue,
-		durable:           durable,
-		autoDelete:        autoDelete,
-		templateEngine:    template.NewEngine(),
+		queue:              queue,
+		durable:            durable,
+		autoDelete:         autoDelete,
+		templateEngine:     template.NewEngine(),
 	}
 
 	// Setup exchange and queue since names are now static
@@ -162,12 +162,12 @@ func (o *RabbitMQOutput) processTemplate(templateStr string, event nomad.Event) 
 	if templateStr == "" {
 		return "", nil
 	}
-	
+
 	result, err := o.templateEngine.ProcessText(templateStr, event)
 	if err != nil {
 		return templateStr, err // Return original template on error
 	}
-	
+
 	return result, nil
 }
 

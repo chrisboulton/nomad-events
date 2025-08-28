@@ -11,11 +11,11 @@ import (
 
 func TestNewManager(t *testing.T) {
 	tests := []struct {
-		name           string
-		outputConfigs  map[string]config.Output
-		expectError    bool
-		errorMsg       string
-		expectedCount  int
+		name          string
+		outputConfigs map[string]config.Output
+		expectError   bool
+		errorMsg      string
+		expectedCount int
 	}{
 		{
 			name: "valid outputs",
@@ -47,7 +47,7 @@ func TestNewManager(t *testing.T) {
 			name: "invalid output configuration",
 			outputConfigs: map[string]config.Output{
 				"slack": {
-					Type: "slack",
+					Type:       "slack",
 					Properties: map[string]interface{}{
 						// Missing required webhook_url
 					},

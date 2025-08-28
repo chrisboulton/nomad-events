@@ -270,5 +270,3 @@ func TestHierarchicalRoutingParentWithoutOutput(t *testing.T) {
 	assert.NoError(t, err)
 	assert.ElementsMatch(t, []string{"job_registered", "all_events"}, outputs)
 }
-
-

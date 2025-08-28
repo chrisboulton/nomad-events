@@ -12,7 +12,7 @@ import (
 )
 
 func TestRabbitMQTemplating(t *testing.T) {
-	
+
 	tests := []struct {
 		name            string
 		config          map[string]interface{}
@@ -88,19 +88,19 @@ func TestRabbitMQTemplating(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create the output (but don't actually connect to RabbitMQ)
 			output := &RabbitMQOutput{
-				exchange:          getStringFromConfig(tt.config, "exchange"),
-				queue:             getStringFromConfig(tt.config, "queue"),
+				exchange:           getStringFromConfig(tt.config, "exchange"),
+				queue:              getStringFromConfig(tt.config, "queue"),
 				routingKeyTemplate: getStringFromConfig(tt.config, "routing_key"),
 			}
-			
+
 			// Set default routing key if empty
 			if output.routingKeyTemplate == "" {
 				output.routingKeyTemplate = "nomad.{{ .Topic }}.{{ .Type }}"
 			}
-			
+
 			// Create template engine
 			output.templateEngine = template.NewEngine()
-			
+
 			// Test routing key template processing
 			routingKey, err := output.processTemplate(output.routingKeyTemplate, tt.event)
 			require.NoError(t, err)

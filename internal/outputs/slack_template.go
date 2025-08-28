@@ -562,7 +562,6 @@ func (ste *SlackTemplateEngine) processText(text interface{}, eventData map[stri
 	return ste.engine.ProcessTextWithData(textStr, eventData)
 }
 
-
 func (ste *SlackTemplateEngine) getNestedValue(data map[string]interface{}, path string) (interface{}, error) {
 	parts := strings.Split(path, ".")
 	current := data

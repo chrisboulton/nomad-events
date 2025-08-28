@@ -112,7 +112,7 @@ routes:
 		t.Run(tt.name, func(t *testing.T) {
 			tmpDir := t.TempDir()
 			configPath := filepath.Join(tmpDir, "config.yaml")
-			
+
 			err := os.WriteFile(configPath, []byte(tt.configYAML), 0644)
 			require.NoError(t, err)
 
@@ -140,7 +140,7 @@ func TestLoadConfigFileNotFound(t *testing.T) {
 func TestLoadConfigInvalidYAML(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "invalid.yaml")
-	
+
 	err := os.WriteFile(configPath, []byte("invalid: yaml: content: ["), 0644)
 	require.NoError(t, err)
 

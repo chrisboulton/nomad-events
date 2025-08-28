@@ -15,10 +15,10 @@ type Router struct {
 }
 
 type routeNode struct {
-	filter        cel.Program
-	output        string         // empty if no output
-	shouldContinue bool           // true by default
-	children      []routeNode    // child routes
+	filter         cel.Program
+	output         string      // empty if no output
+	shouldContinue bool        // true by default
+	children       []routeNode // child routes
 }
 
 func NewRouter(routes []config.Route) (*Router, error) {
@@ -81,10 +81,10 @@ func buildRouteNodes(routes []config.Route, env *cel.Env) ([]routeNode, error) {
 		}
 
 		nodes[i] = routeNode{
-			filter:        program,
-			output:        route.Output,
+			filter:         program,
+			output:         route.Output,
 			shouldContinue: continueFlag,
-			children:      children,
+			children:       children,
 		}
 	}
 
