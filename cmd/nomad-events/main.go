@@ -191,7 +191,7 @@ For more information, see: https://github.com/your-repo/nomad-events
 		}
 		fmt.Printf("   - Routing configuration: valid\n")
 
-		// Test output manager creation  
+		// Test output manager creation
 		_, err = outputs.NewManager(cfg.Outputs, nil)
 		if err != nil {
 			slog.Error("Failed to validate output configuration", "error", err)
@@ -203,8 +203,8 @@ For more information, see: https://github.com/your-repo/nomad-events
 		os.Exit(0)
 	}
 
-	slog.Info("Starting nomad-events", 
-		"version", version, 
+	slog.Info("Starting nomad-events",
+		"version", version,
 		"nomad_address", cfg.Nomad.Address,
 		"config_path", *configPath)
 
@@ -245,15 +245,14 @@ For more information, see: https://github.com/your-repo/nomad-events
 		processEvents(ctx, eventChan, serviceManager)
 	}()
 
-	slog.Info("Service started successfully", 
-		"event_buffer_size", cap(eventChan),
-		"config_reload", "Send SIGHUP to reload configuration")
+	slog.Info("Service started successfully",
+		"event_buffer_size", cap(eventChan))
 
 	// Signal handling loop
 	for {
 		sig := <-sigChan
 		slog.Info("Received signal", "signal", sig.String())
-		
+
 		switch sig {
 		case syscall.SIGHUP:
 			slog.Info("SIGHUP received - reloading configuration...")
@@ -263,14 +262,14 @@ For more information, see: https://github.com/your-repo/nomad-events
 				slog.Info("Configuration reload successful")
 			}
 			continue
-			
+
 		case syscall.SIGINT, syscall.SIGTERM:
 			slog.Info("Initiating graceful shutdown...")
 			cancel()
 
 			// Close event channel and wait for goroutines with timeout
 			close(eventChan)
-			
+
 			done := make(chan struct{})
 			go func() {
 				wg.Wait()
@@ -283,7 +282,7 @@ For more information, see: https://github.com/your-repo/nomad-events
 			case <-time.After(30 * time.Second):
 				slog.Warn("Shutdown timeout exceeded, forcing exit")
 			}
-			
+
 			return // Exit the main function
 		}
 	}
@@ -303,16 +302,16 @@ func processEvents(ctx context.Context, eventChan <-chan nomad.Event, serviceMan
 			}
 
 			eventCount++
-			
-			slog.Debug("Processing event", 
-				"topic", event.Topic, 
-				"type", event.Type, 
+
+			slog.Debug("Processing event",
+				"topic", event.Topic,
+				"type", event.Type,
 				"key", event.Key,
 				"index", event.Index)
 
 			matchedOutputs, err := serviceManager.Route(event)
 			if err != nil {
-				slog.Error("Failed to route event", 
+				slog.Error("Failed to route event",
 					"error", err,
 					"topic", event.Topic,
 					"type", event.Type,
@@ -320,14 +319,14 @@ func processEvents(ctx context.Context, eventChan <-chan nomad.Event, serviceMan
 				continue
 			}
 
-			slog.Debug("Event routed", 
-				"topic", event.Topic, 
-				"type", event.Type, 
+			slog.Debug("Event routed",
+				"topic", event.Topic,
+				"type", event.Type,
 				"outputs", matchedOutputs)
 
 			for _, outputName := range matchedOutputs {
 				if err := serviceManager.Send(outputName, event); err != nil {
-					slog.Error("Failed to send event to output", 
+					slog.Error("Failed to send event to output",
 						"error", err,
 						"output", outputName,
 						"topic", event.Topic,
